@@ -1,3 +1,18 @@
+/**
+ * Copyright (c) 2007-2017 The Apereo Foundation
+ *
+ * Licensed under the Educational Community License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *             http://opensource.org/licenses/ecl2
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 /*
 * Licensed to The Apereo Foundation under one or more contributor license
 * agreements. See the NOTICE file distributed with this work for
@@ -19,9 +34,10 @@
 
 package org.sakaiproject.signup.logic;
 
-import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -115,7 +131,7 @@ public class SignupCalendarHelperImpl implements SignupCalendarHelper {
 				tsEvent.getProperties().addProperty(ResourceProperties.PROP_CREATOR, meeting.getCreatorUserId());
 
 				//generate VEvent for timeslot
-				v = externalCalendaringService.createEvent(tsEvent);
+				v = externalCalendaringService.createEvent(tsEvent, null, true);
 				externalCalendaringService.addChairAttendeesToEvent(v, getCoordinators(meeting));
 				
 			} finally {
@@ -150,7 +166,7 @@ public class SignupCalendarHelperImpl implements SignupCalendarHelper {
 				mEvent.getProperties().addProperty(ResourceProperties.PROP_CREATOR, meeting.getCreatorUserId());
 
 				//generate VEvent for timeslot
-				v = externalCalendaringService.createEvent(mEvent);
+				v = externalCalendaringService.createEvent(mEvent, null, true);
 				externalCalendaringService.addChairAttendeesToEvent(v, getCoordinators(meeting));
 				
 			} finally {
@@ -163,14 +179,14 @@ public class SignupCalendarHelperImpl implements SignupCalendarHelper {
 	}
 
 	/**
-	 * Helper to get a list of Users who are coordinates for a given meeting
+	 * Helper to get a set of Users who are coordinates for a given meeting
 	 *     meeting.coordinatorIds.map(userDirectoryService.getUser)
 	 *
 	 * @param meeting  the meeting in question
 	 * @return the list of coordinator Users
 	 */
-	private List<User> getCoordinators(SignupMeeting meeting) {
-		List<User> users = new ArrayList<User>();
+	private Set<User> getCoordinators(SignupMeeting meeting) {
+		Set<User> users = new HashSet<User>();
 		List<String> ids = meeting.getCoordinatorIdsList();
 		for (String coordinator : ids) {
 			users.add(sakaiFacade.getUserQuietly(coordinator));
@@ -190,7 +206,7 @@ public class SignupCalendarHelperImpl implements SignupCalendarHelper {
 	@Override
 	public String createCalendarFile(List<VEvent> vevents, String method) {
 		//create calendar
-		net.fortuna.ical4j.model.Calendar cal = externalCalendaringService.createCalendar(vevents, method);
+		net.fortuna.ical4j.model.Calendar cal = externalCalendaringService.createCalendar(vevents, method, true);
 				
 		//get path to file
 		return externalCalendaringService.toFile(cal);
@@ -201,12 +217,12 @@ public class SignupCalendarHelperImpl implements SignupCalendarHelper {
 		return externalCalendaringService.cancelEvent(vevent);
 	}
 	
-	public VEvent addUsersToVEvent(VEvent vevent, List<User> users) {
+	public VEvent addUsersToVEvent(VEvent vevent, Set<User> users) {
 		return externalCalendaringService.addAttendeesToEvent(vevent, users);
 	}
 
-	public VEvent addAttendeesToVEvent(VEvent vevent, List<SignupAttendee> attendees) {
-        List<User> users = new ArrayList<User>();
+	public VEvent addAttendeesToVEvent(VEvent vevent, Set<SignupAttendee> attendees) {
+        Set<User> users = new HashSet<User>();
         for (SignupAttendee attendee : attendees) {
             User user = sakaiFacade.getUser(attendee.getAttendeeUserId());
             if (user != null) {

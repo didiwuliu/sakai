@@ -34,8 +34,7 @@ import java.util.Stack;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.xml.serializer.ToXMLStream;
 import org.radeox.api.engine.context.InitialRenderContext;
 import org.radeox.filter.context.FilterContext;
@@ -56,10 +55,9 @@ import org.xml.sax.helpers.AttributesImpl;
  * @version $Id: ParagraphFilter.java 4158 2005-11-25 23:25:19Z
  *          ian@caret.cam.ac.uk $
  */
-
+@Slf4j
 public class XHTMLFilter implements Filter, CacheFilter
 {
-	private static Logger log = LoggerFactory.getLogger(XHTMLFilter.class);
 
 	private static SAXParserFactory saxParserFactory = SAXParserFactory.newInstance();
 	private static final Map blockElements = new HashMap();
@@ -149,8 +147,11 @@ public class XHTMLFilter implements Filter, CacheFilter
 			String output = new String(baos.toByteArray(), "UTF-8");
 			int startBlock = output.indexOf("<sr>");
 			int endBlock = output.indexOf("</sr>");
-			finalOutput = output.substring(startBlock + 4, endBlock);
-			// log.warn("Output is "+finalOutput);
+			if(startBlock >= 0 && endBlock >= 0)
+			{
+				finalOutput = output.substring(startBlock + 4, endBlock);
+			}
+			log.debug("Output is "+finalOutput);
 		}
 		catch (Throwable t)
 		{

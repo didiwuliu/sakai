@@ -15,8 +15,8 @@
 		<script type="text/javascript">includeLatestJQuery("msgcntr");</script>
 		<sakai:script contextBase="/messageforums-tool" path="/js/dialog.js"/>
   		<link rel="stylesheet" type="text/css" href="/messageforums-tool/css/dialog.css" />
-		<script type="text/javascript" src="/library/js/jquery/qtip/jquery.qtip-latest.min.js"></script>
-		<link rel="stylesheet" type="text/css" href="/library/js/jquery/qtip/jquery.qtip-latest.min.css" />
+		<script type="text/javascript" src="/library/webjars/qtip2/3.0.3/jquery.qtip.min.js"></script>
+		<link rel="stylesheet" type="text/css" href="/library/webjars/qtip2/3.0.3/jquery.qtip.min.css" />
 		<sakai:script contextBase="/messageforums-tool" path="/js/sak-10625.js"/>
 		<sakai:script contextBase="/messageforums-tool" path="/js/forum.js"/>
 	<%--//
@@ -73,8 +73,8 @@
 					<h:graphicImage url="/../../library/image/silk/printer.png" alt="#{msgs.print_friendly}" title="#{msgs.print_friendly}" />
 				</h:outputLink>
  		</sakai:tool_bar>
-			<h:panelGrid columns="2" width="100%" styleClass="navPanel specialLink">
-			    <h:panelGroup>
+		<div class="row">
+			<div class="col-md-9 col-xs-12">
 					<f:verbatim><div class="breadCrumb specialLink"><h3></f:verbatim>
 			      <h:commandLink action="#{ForumTool.processActionHome}" value="#{msgs.cdfm_message_forums}" title=" #{msgs.cdfm_message_forums}"
 			      		rendered="#{ForumTool.messagesandForums}" />
@@ -88,8 +88,8 @@
 				  <f:verbatim><h:outputText value=" " /><h:outputText value=" / " /><h:outputText value=" " /></f:verbatim>
 				  	  <h:outputText value="#{ForumTool.selectedTopic.topic.title}" />
 					  <f:verbatim></h3></div></f:verbatim>
-				 </h:panelGroup>
-				 <h:panelGroup styleClass="itemNav">
+			</div>
+			<div class="pull-right">
 				   <h:outputText  styleClass="button formButtonDisabled"  value="#{msgs.cdfm_previous_topic}"  rendered="#{!ForumTool.selectedTopic.hasPreviousTopic}" />
 					 <h:commandLink  styleClass="button" action="#{ForumTool.processActionDisplayPreviousTopic}" value="#{msgs.cdfm_previous_topic}"  rendered="#{ForumTool.selectedTopic.hasPreviousTopic}" 
 					                title=" #{msgs.cdfm_previous_topic}">
@@ -102,8 +102,8 @@
 						<f:param value="#{ForumTool.selectedTopic.nextTopicId}" name="nextTopicId"/>
 						<f:param value="#{ForumTool.selectedForum.forum.id}" name="forumId"/>
 					 </h:commandLink>
-				 </h:panelGroup>
-			</h:panelGrid>
+ 			</div>
+ 		</div>
 	
 		<%--rjlowe: Expanded View to show the message bodies, threaded --%>
 	<span class="skip" id="firstNewItemTitleHolder"><h:outputText value="#{msgs.cdfm_gotofirstnewtitle}" /></span>

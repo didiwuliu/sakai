@@ -1,24 +1,18 @@
-/**********************************************************************************
-*
-* $Id$
-*
-***********************************************************************************
-*
- * Copyright (c) 2005, 2006, 2007, 2008, 2009 The Sakai Foundation, The MIT Corporation
+/**
+ * Copyright (c) 2003-2016 The Apereo Foundation
  *
  * Licensed under the Educational Community License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *       http://www.opensource.org/licenses/ECL-2.0
+ *             http://opensource.org/licenses/ecl2
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
-*
-**********************************************************************************/
+ */
 
 package org.sakaiproject.tool.gradebook.ui;
 
@@ -27,18 +21,21 @@ import javax.servlet.ServletRequest;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
 import org.sakaiproject.section.api.SectionAwareness;
-
 import org.sakaiproject.service.gradebook.shared.GradebookNotFoundException;
 import org.sakaiproject.service.gradebook.shared.GradebookPermissionService;
 import org.sakaiproject.service.gradebook.shared.GradebookExternalAssessmentService;
+import org.sakaiproject.service.gradebook.shared.GradebookFrameworkService;
 import org.sakaiproject.tool.gradebook.Gradebook;
 import org.sakaiproject.tool.gradebook.business.GradebookManager;
 import org.sakaiproject.tool.gradebook.business.GradebookScoringAgentManager;
-import org.sakaiproject.tool.gradebook.facades.*;
+import org.sakaiproject.tool.gradebook.facades.Authn;
+import org.sakaiproject.tool.gradebook.facades.Authz;
+import org.sakaiproject.tool.gradebook.facades.ContextManagement;
+import org.sakaiproject.tool.gradebook.facades.EventTrackingService;
+import org.sakaiproject.tool.gradebook.facades.UserDirectoryService;
 
 /**
  * Provide a UI handle to the selected gradebook.
@@ -48,12 +45,10 @@ import org.sakaiproject.tool.gradebook.facades.*;
  * business or facade services, this bean is also a reasonable place to centralize
  * configuration of and access to those services.
  */
+@Slf4j
 public class GradebookBean extends InitializableBean {
-    private static final Logger logger = LoggerFactory.getLogger(GradebookBean.class);
-
     private Long gradebookId;
     private String gradebookUid;
-
 
     // These interfaces are defined application-wide (through Spring, although the
     // UI classes don't know that).
@@ -68,6 +63,7 @@ public class GradebookBean extends InitializableBean {
     private GradebookPermissionService gradebookPermissionService;
     private GradebookExternalAssessmentService gradebookExternalAssessmentService;
     private GradebookScoringAgentManager scoringAgentManager;
+    private GradebookFrameworkService gradebookFrameworkService;
     
     /**
      * @return Returns the gradebookId.
@@ -89,28 +85,34 @@ public class GradebookBean extends InitializableBean {
      * into play on each request.
      */
     public final void setGradebookUid(String newGradebookUid) {
-        Long newGradebookId = null;
-        if (newGradebookUid != null) {
-            Gradebook gradebook = null;
-            try {
-                gradebook = getGradebookManager().getGradebook(newGradebookUid);
-            } catch (GradebookNotFoundException gnfe) {
-                logger.error("Request made for inaccessible gradebookUid=" + newGradebookUid);
-                newGradebookUid = null;
-            }
-            if(gradebook == null)
-            	throw new IllegalStateException("Gradebook gradebook == null!");
-            newGradebookId = gradebook.getId();
-            if (logger.isDebugEnabled()) logger.debug("setGradebookUid gradebookUid=" + newGradebookUid + ", gradebookId=" + newGradebookId);
-        }
-        this.gradebookUid = newGradebookUid;
-        setGradebookId(newGradebookId);
+    	Long newGradebookId = null;
+    	if (newGradebookUid != null) {
+    		Gradebook gradebook = null;
+    		try {
+    			gradebook = getGradebookManager().getGradebook(newGradebookUid);
+    		} catch (GradebookNotFoundException gnfe1) {
+    			log.debug("Request made for inaccessible, adding gradebookUid=" + newGradebookUid);
+    			getGradebookFrameworkService().addGradebook(newGradebookUid,newGradebookUid);
+    			try {
+    				gradebook = getGradebookManager().getGradebook(newGradebookUid);
+    			} catch (GradebookNotFoundException gnfe2) {
+    				log.error("Request made and could not add inaccessible gradebookUid=" + newGradebookUid);
+    				newGradebookUid = null;
+    			}
+    		}
+    		if(gradebook == null)
+    			throw new IllegalStateException("Gradebook gradebook == null!");
+    		newGradebookId = gradebook.getId();
+    		if (log.isDebugEnabled()) log.debug("setGradebookUid gradebookUid=" + newGradebookUid + ", gradebookId=" + newGradebookId);
+    	}
+    	this.gradebookUid = newGradebookUid;
+    	setGradebookId(newGradebookId);
     }
 
     private final void refreshFromRequest() {
         String requestUid = contextManagementService.getGradebookUid(FacesContext.getCurrentInstance().getExternalContext().getRequest());
         if ((requestUid != null) && (!requestUid.equals(gradebookUid))) {
-            if (logger.isDebugEnabled()) logger.debug("resetting gradebookUid from " + gradebookUid);
+            if (log.isDebugEnabled()) log.debug("resetting gradebookUid from " + gradebookUid);
             setGradebookUid(requestUid);
         }
     }
@@ -141,10 +143,25 @@ public class GradebookBean extends InitializableBean {
     }
 
     /**
+     * @return Returns the gradebookFrameworkService
+     */
+    public GradebookFrameworkService getGradebookFrameworkService() {
+        return gradebookFrameworkService;
+    }
+
+    /**
      * @param gradebookManager The gradebookManager to set.
      */
     public void setGradebookManager(GradebookManager gradebookManager) {
         this.gradebookManager = gradebookManager;
+    }
+
+    /**
+     * @param gradebookFrameworkServicee The gradebookFrameworkService to set.
+     */
+
+    public void setGradebookFrameworkService(GradebookFrameworkService gradebookFrameworkService) {
+        this.gradebookFrameworkService = gradebookFrameworkService;
     }
 
     public SectionAwareness getSectionAwareness() {
@@ -208,34 +225,31 @@ public class GradebookBean extends InitializableBean {
         this.eventTrackingService = eventTrackingService;
     }
 
-	public ConfigurationBean getConfigurationBean() {
-		return configurationBean;
-	}
-	public void setConfigurationBean(ConfigurationBean configurationBean) {
-		this.configurationBean = configurationBean;
-	}
+    public ConfigurationBean getConfigurationBean() {
+        return configurationBean;
+    }
+    public void setConfigurationBean(ConfigurationBean configurationBean) {
+        this.configurationBean = configurationBean;
+    }
 	
-	public GradebookPermissionService getGradebookPermissionService() {
-		return gradebookPermissionService;
-	}
-	public void setGradebookPermissionService(GradebookPermissionService gradebookPermissionService) {
-		this.gradebookPermissionService = gradebookPermissionService;
-	}
+    public GradebookPermissionService getGradebookPermissionService() {
+        return gradebookPermissionService;
+    }
+    public void setGradebookPermissionService(GradebookPermissionService gradebookPermissionService) {
+        this.gradebookPermissionService = gradebookPermissionService;
+    }
 	
-	public GradebookExternalAssessmentService getGradebookExternalAssessmentService() {
-		return gradebookExternalAssessmentService;
-	}
-	public void setGradebookExternalAssessmentService(GradebookExternalAssessmentService gradebookExternalAssessmentService) {
-		this.gradebookExternalAssessmentService = gradebookExternalAssessmentService;
-	}
+    public GradebookExternalAssessmentService getGradebookExternalAssessmentService() {
+        return gradebookExternalAssessmentService;
+    }
+    public void setGradebookExternalAssessmentService(GradebookExternalAssessmentService gradebookExternalAssessmentService) {
+        this.gradebookExternalAssessmentService = gradebookExternalAssessmentService;
+    }
 	
-	public GradebookScoringAgentManager getScoringAgentManager() {
-		return this.scoringAgentManager;
-	}
-	public void setScoringAgentManager(GradebookScoringAgentManager scoringAgentManager) {
-		this.scoringAgentManager = scoringAgentManager;
-	}
+    public GradebookScoringAgentManager getScoringAgentManager() {
+        return this.scoringAgentManager;
+    }
+    public void setScoringAgentManager(GradebookScoringAgentManager scoringAgentManager) {
+        this.scoringAgentManager = scoringAgentManager;
+    }
 }
-
-
-

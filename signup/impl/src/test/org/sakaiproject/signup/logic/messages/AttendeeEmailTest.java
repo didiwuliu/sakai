@@ -1,3 +1,18 @@
+/**
+ * Copyright (c) 2007-2016 The Apereo Foundation
+ *
+ * Licensed under the Educational Community License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *             http://opensource.org/licenses/ecl2
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.sakaiproject.signup.logic.messages;
 
 import net.fortuna.ical4j.model.component.VEvent;
@@ -15,6 +30,7 @@ import org.sakaiproject.user.api.User;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
@@ -93,7 +109,7 @@ public class AttendeeEmailTest {
     private void assertGenerates(int n) {
         final List<VEvent> events = _email.generateEvents(_mockedAttendingUser, _mockedCalendarHelper);
         assertEquals(n, events.size());
-        verify(_mockedCalendarHelper, times(n)).addUsersToVEvent(eq(_mockedEvent), any(List.class));
+        verify(_mockedCalendarHelper, times(n)).addUsersToVEvent(eq(_mockedEvent), any(Set.class));
     }
 
     private void userIsAttendingTimeslot(String userId, SignupTimeslot mockedTimeslot) {

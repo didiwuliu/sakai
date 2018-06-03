@@ -1,13 +1,19 @@
-/*
- * Copyright (c) Orchestral Developments Ltd and the Orion Health group of companies (2001 - 2016).
+/**
+ * Copyright (c) 2003-2017 The Apereo Foundation
  *
- * This document is copyright. Except for the purpose of fair reviewing, no part
- * of this publication may be reproduced or transmitted in any form or by any
- * means, electronic or mechanical, including photocopying, recording, or any
- * information storage and retrieval system, without permission in writing from
- * the publisher. Infringers of copyright render themselves liable for
- * prosecution.
+ * Licensed under the Educational Community License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *             http://opensource.org/licenses/ecl2
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.sakaiproject.gradebookng.business.util;
 
 import java.util.ArrayList;
@@ -120,18 +126,19 @@ public class CourseGradeFormatter {
 		}
 
 		if (StringUtils.isNotBlank(letterGrade)
-				&& (this.gradebook.isCourseLetterGradeDisplayed() || this.currentUserRole == GbRole.INSTRUCTOR)) {
+				&& (this.gradebook.isCourseLetterGradeDisplayed() || shouldDisplayFullCourseGrade())) {
 			parts.add(letterGrade);
 		}
 
 		// percentage
+		// not shown in final grade mode
 		final String calculatedGrade;
 		if (this.showOverride && StringUtils.isNotBlank(courseGrade.getEnteredGrade())) {
 
 			// if mapping doesn't exist for this grade override (mapping may have been changed!), map it to 0.
 			// TODO this should probably inform the instructor
 			Double mappedGrade = this.gradebook.getSelectedGradeMapping().getGradeMap().get(courseGrade.getEnteredGrade());
-			if(mappedGrade == null) {
+			if (mappedGrade == null) {
 				mappedGrade = new Double(0);
 			}
 			calculatedGrade = FormatHelper.formatDoubleAsPercentage(mappedGrade);
@@ -141,7 +148,7 @@ public class CourseGradeFormatter {
 		}
 
 		if (StringUtils.isNotBlank(calculatedGrade)
-				&& (this.gradebook.isCourseAverageDisplayed() || this.currentUserRole == GbRole.INSTRUCTOR)) {
+				&& (this.gradebook.isCourseAverageDisplayed() || shouldDisplayFullCourseGrade())) {
 			if (parts.isEmpty()) {
 				parts.add(new StringResourceModel("coursegrade.display.percentage-first", null,
 						new Object[] { calculatedGrade }).getString());
@@ -157,24 +164,28 @@ public class CourseGradeFormatter {
 			// don't display points for weighted category type
 			final GbCategoryType categoryType = GbCategoryType.valueOf(this.gradebook.getCategory_type());
 			if (categoryType != GbCategoryType.WEIGHTED_CATEGORY) {
-				
+
 				Double pointsEarned = courseGrade.getPointsEarned();
 				Double totalPointsPossible = courseGrade.getTotalPointsPossible();
-				
+
 				// handle the special case in the gradebook service where totalPointsPossible = -1
-				if(totalPointsPossible != null && totalPointsPossible == -1) {
+				if (totalPointsPossible != null && totalPointsPossible == -1) {
 					pointsEarned = null;
 					totalPointsPossible = null;
 				}
 
 				// if instructor, show the points if requested
 				// otherwise check the settings
-				if (this.currentUserRole == GbRole.INSTRUCTOR || this.gradebook.isCoursePointsDisplayed()) {
-					if(pointsEarned != null && totalPointsPossible != null) {
+				if (shouldDisplayFullCourseGrade() || this.gradebook.isCoursePointsDisplayed()) {
+					if (pointsEarned != null && totalPointsPossible != null) {
+						final String pointsEarnedDisplayString = FormatHelper.formatGradeForDisplay(pointsEarned);
+						final String totalPointsPossibleDisplayString = FormatHelper.formatGradeForDisplay(totalPointsPossible);
 						if (parts.isEmpty()) {
-							parts.add(MessageHelper.getString("coursegrade.display.points-first", pointsEarned, totalPointsPossible));
+							parts.add(MessageHelper.getString("coursegrade.display.points-first", pointsEarnedDisplayString,
+									totalPointsPossibleDisplayString));
 						} else {
-							parts.add(MessageHelper.getString("coursegrade.display.points-second", pointsEarned, totalPointsPossible));
+							parts.add(MessageHelper.getString("coursegrade.display.points-second", pointsEarnedDisplayString,
+									totalPointsPossibleDisplayString));
 						}
 					}
 				}
@@ -189,4 +200,7 @@ public class CourseGradeFormatter {
 		return String.join(" ", parts);
 	}
 
+	private boolean shouldDisplayFullCourseGrade() {
+		return GbRole.INSTRUCTOR.equals(this.currentUserRole) || GbRole.TA.equals(this.currentUserRole);
+	}
 }

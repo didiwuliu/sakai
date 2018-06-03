@@ -19,7 +19,6 @@
  *
  **********************************************************************************/
 
-
 package org.sakaiproject.tool.assessment.integration.helper.integrated;
 
 import java.util.ArrayList;
@@ -31,8 +30,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang.StringUtils;
 
 import org.sakaiproject.authz.api.Member;
 import org.sakaiproject.exception.IdUnusedException;
@@ -48,6 +47,8 @@ import org.sakaiproject.tool.assessment.data.dao.assessment.AssessmentAccessCont
 import org.sakaiproject.tool.assessment.data.dao.authz.AuthorizationData;
 import org.sakaiproject.tool.assessment.data.ifc.assessment.PublishedAssessmentIfc;
 import org.sakaiproject.tool.assessment.facade.PublishedAssessmentFacade;
+import org.sakaiproject.tool.assessment.integration.context.IntegrationContextFactory;
+import org.sakaiproject.tool.assessment.integration.helper.ifc.GradebookServiceHelper;
 import org.sakaiproject.tool.assessment.services.PersistenceService;
 import org.sakaiproject.tool.assessment.services.assessment.PublishedAssessmentService;
 import org.sakaiproject.user.api.UserDirectoryService;
@@ -56,22 +57,22 @@ import org.sakaiproject.user.api.UserDirectoryService;
 /**
  * Provides info to the gradebook about which assessments are visible
  */
+@Slf4j
 public class AssessmentGradeInfoProvider implements ExternalAssignmentProvider, ExternalAssignmentProviderCompat {
 
-    private Logger log = LoggerFactory.getLogger(AssessmentGradeInfoProvider.class);
     private GradebookExternalAssessmentService geaService;
     private UserDirectoryService userDirectoryService;
     private SiteService siteService;
     private MemoryService memoryService;
 
-    private Cache groupedCache;
-    private Cache pubAssessmentCache;
+    private Cache<String, Boolean> groupedCache;
+    private Cache<String, PublishedAssessmentIfc> pubAssessmentCache;
     
     public void init() {
         log.info("INIT and Register Samigo AssessmentGradeInfoProvider");
         geaService.registerExternalAssignmentProvider(this);
-        groupedCache = memoryService.newCache("org.sakaiproject.tool.assessment.integration.helper.integrated.AssessmentGradeInfoProvider.groupedCache");
-        pubAssessmentCache = memoryService.newCache("org.sakaiproject.tool.assessment.integration.helper.integrated.AssessmentGradeInfoProvider.pubAssessmentCache");
+        groupedCache = memoryService.getCache("org.sakaiproject.tool.assessment.integration.helper.integrated.AssessmentGradeInfoProvider.groupedCache");
+        pubAssessmentCache = memoryService.getCache("org.sakaiproject.tool.assessment.integration.helper.integrated.AssessmentGradeInfoProvider.pubAssessmentCache");
     }
 
     public void destroy() {
@@ -85,48 +86,67 @@ public class AssessmentGradeInfoProvider implements ExternalAssignmentProvider, 
 
     
     private PublishedAssessmentIfc getPublishedAssessment(String id) {
+        PublishedAssessmentIfc a = (PublishedAssessmentIfc) pubAssessmentCache.get(id);
+        if (a != null) {
+            log.debug("Returning assessment {} from cache", id);
+            return a;
+        }
 
-    	if (pubAssessmentCache.containsKey(id)) {
-    		if (log.isDebugEnabled()) {
-    			log.debug("returning assesment " + id + " from cache");
-    		}
-    		return (PublishedAssessmentIfc)pubAssessmentCache.get(id);
-    	}
+        /* Below we may fail to re-establish the value */
+        pubAssessmentCache.remove(id);
 
         PublishedAssessmentService pas = new PublishedAssessmentService();
-        PublishedAssessmentIfc a;
         try {
             a = pas.getPublishedAssessment(id);
             pubAssessmentCache.put(id, a);
         } catch (Exception e) {
             // NumberFormatException is thrown on non-numeric IDs
-            if (log.isDebugEnabled()) {
-                log.debug("Assessment lookup failed for ID: " + id + " -- " + e.getMessage());
-            }
+            log.debug("Assessment lookup failed for ID: {} -- {}", id, e.getMessage());
             a = null;
-            pubAssessmentCache.put(id, null);
+            /* The present cache cannot cache nulls, so nothing to do here. */
+            /* If this ever changes, caching this reply might be a good idea */
         }
         return a;
     }
 
-    public boolean isAssignmentDefined(String id) {
-        if (log.isDebugEnabled()) {
+    public boolean isAssignmentDefined(String externalAppName, String id) {
+    	    // SAM-3068 avoid looking up another tool's id
+    	    if (!StringUtils.isNumeric(id)) {
+            return false;
+    	    }
+
+    	    GradebookServiceHelper gbsHelper = IntegrationContextFactory.getInstance().getGradebookServiceHelper();
+    	    String toolName = gbsHelper.getAppName();
+    	    if (!StringUtils.equals(externalAppName, getAppKey()) && !StringUtils.equals(externalAppName, toolName)) {
+    	    	    return false;
+    	    }
+
+    	    if (log.isDebugEnabled()) {
             log.debug("Samigo provider isAssignmentDefined: " + id);
-        }
-        return getPublishedAssessment(id) != null;
+    	    }
+
+    	    Long longId = Long.parseLong(id);
+    	    return PersistenceService.getInstance().getPublishedAssessmentFacadeQueries().isPublishedAssessmentIdValid(longId);
     }
 
     
     public boolean isAssignmentGrouped(String id) {
-        if (log.isDebugEnabled()) {
-            log.debug("Samigo provider isAssignmentGrouped: " + id);
+        // SAM-3068 avoid looking up another tool's id
+        if (!StringUtils.isNumeric(id)) {
+            return false;
         }
+
+        log.debug("Samigo provider isAssignmentGrouped: {}", id);
         
+        Boolean g = null;
         if (groupedCache.containsKey(id)) {
-        	if (log.isDebugEnabled()) {
-        		log.debug("returning grouped value from cache: " + id);
-        	}
-        	return (Boolean)groupedCache.get(id);
+            g = (Boolean)groupedCache.get(id);
+            if(g != null) {
+                if (log.isDebugEnabled()) {
+                    log.debug("returning grouped value from cache: " + id);
+                }
+                return (boolean) g;
+            }
         }
         
         PublishedAssessmentService pas = new PublishedAssessmentService();

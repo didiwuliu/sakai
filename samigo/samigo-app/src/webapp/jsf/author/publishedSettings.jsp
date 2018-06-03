@@ -43,28 +43,72 @@
     <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
       <head><%= request.getAttribute("html.head") %>
       <title><h:outputText value="#{assessmentSettingsMessages.sakai_assessment_manager} #{assessmentSettingsMessages.dash} #{assessmentSettingsMessages.settings}" /></title>
-      <script type="text/javascript" src="../../js/extendedTime.js"/>
       <samigo:script path="/jsf/widget/hideDivision/hideDivision.js"/>
       <samigo:script path="/jsf/widget/colorpicker/colorpicker.js"/>
-      <script type="text/javascript" src="/library/js/lang-datepicker/lang-datepicker.js"></script>
+      <samigo:script path="/../library/js/lang-datepicker/lang-datepicker.js"/>
       <samigo:script path="/js/authoring.js"/>        
 
       <script type="text/javascript">
       if (needJQuery) {
-         document.write('\x3Clink href="/library/webjars/jquery-ui/1.11.3/jquery-ui.min.css?version=" rel="stylesheet">');
+         document.write('\x3Clink href="/library/webjars/jquery-ui/1.12.1/jquery-ui.min.css?version=" rel="stylesheet">');
       }
       </script>
 
       <script type="text/javascript">
         $(document).ready(function() {
           // set up the accordion for settings
-          $("#jqueryui-accordion").accordion({ heightStyle: "content", collapsible: true, active: 1 });
+          var accordionPanel = 1;
+          var itemName = "samigo_publishedsettings_" + <h:outputText value="#{publishedSettings.assessmentId}"/>;
+          if (window.sessionStorage && window.sessionStorage.getItem(itemName)) {
+              accordionPanel = parseInt(window.sessionStorage.getItem(itemName));
+          }
+          $("#jqueryui-accordion").accordion({
+              heightStyle: "content",
+              activate: function(event, ui) {
+                  if (window.sessionStorage) {
+                      window.sessionStorage.setItem(itemName, $("#jqueryui-accordion").accordion("option", "active"));
+                  }
+              },
+              active: accordionPanel,
+              collapsible: true
+          });
           // This is a sub-accordion inside of the About the Assessment Panel
           $("#jqueryui-accordion-metadata").accordion({ heightStyle: "content",collapsible: true,active: false });
           // This is a sub-accordion inside of the Availability and Submission Panel
           $("#jqueryui-accordion-security").accordion({ heightStyle: "content",collapsible: true,active: false });
           // adjust the height of the iframe to accomodate the expansion from the accordion
           $("body").height($("body").outerHeight() + 900);
+
+          checkNav = function() {
+              QuesFormatRadios = ["assessmentSettingsAction\\:assessmentFormat\\:0", "assessmentSettingsAction\\:assessmentFormat\\:1", "assessmentSettingsAction\\:assessmentFormat\\:2"];
+
+              enabled = true;
+              if ($("#assessmentSettingsAction\\:itemNavigation\\:0").is(":checked")) {
+                enabled = false;
+              }
+
+              if (enabled) {
+                  $('#assessmentSettingsAction\\:markForReview1').removeAttr("disabled");
+                  $('#assessmentSettingsAction\\:markForReview1').parent().toggleClass("placeholder");
+                  QuesFormatRadios.forEach( function(v, i, a) {
+                      $('label[for="' + v + '"]').toggleClass("placeholder");
+                      $("#" + v).removeAttr("disabled");
+                  });
+              } else {
+                  $('#assessmentSettingsAction\\:markForReview1').attr("disabled", true);
+                  $('#assessmentSettingsAction\\:markForReview1').attr("checked", false);
+                  $('#assessmentSettingsAction\\:markForReview1').parent().toggleClass("placeholder");
+                  QuesFormatRadios.forEach( function(v, i, a) {
+                      $('#assessmentSettingsAction\\:assessmentFormat\\:0').click();
+                      $('label[for="' + v + '"]').toggleClass("placeholder");
+                      $("#" + v).attr("disabled", true);
+                  });
+              }
+          };
+
+          $('#assessmentSettingsAction\\:itemNavigation\\:0').change(checkNav);
+          $('#assessmentSettingsAction\\:itemNavigation\\:1').change(checkNav);
+          checkNav();
 
           // SAM-2323 jquery-UI datepicker
           localDatePicker({
@@ -99,6 +143,30 @@
               val: '<h:outputText value="#{publishedSettings.feedbackDate}"><f:convertDateTime pattern="yyyy-MM-dd HH:mm:ss"/></h:outputText>',
               ashidden: { iso8601: 'feedbackDateISO8601' }
           });
+          localDatePicker({
+              input: '#assessmentSettingsAction\\:newEntry-start_date',
+              useTime: 1,
+              parseFormat: 'YYYY-MM-DD HH:mm:ss',
+              allowEmptyDate: true,
+              val: '<h:outputText value="#{publishedSettings.extendedTimeStartString}"/>',
+              ashidden: { iso8601: 'newEntry-start_date-iso8601' }
+          });
+          localDatePicker({
+              input: '#assessmentSettingsAction\\:newEntry-due_date',
+              useTime: 1,
+              parseFormat: 'YYYY-MM-DD HH:mm:ss',
+              allowEmptyDate: true,
+              val: '<h:outputText value="#{publishedSettings.extendedTimeDueString}"/>',
+              ashidden: { iso8601: 'newEntry-due_date-iso8601' }
+          });
+          localDatePicker({
+              input: '#assessmentSettingsAction\\:newEntry-retract_date',
+              useTime: 1,
+              parseFormat: 'YYYY-MM-DD HH:mm:ss',
+              allowEmptyDate: true,
+              val: '<h:outputText value="#{publishedSettings.extendedTimeRetractString}"/>',
+              ashidden: { iso8601: 'newEntry-retract_date-iso8601' }
+          });
 
           // SAM-2121: Lockdown the question layout and mark for review if necessary
           var navVal = $('#assessmentSettingsAction\\:itemNavigation input:radio:checked').val();
@@ -106,7 +174,6 @@
           lockdownMarkForReview(navVal);
           showHideReleaseGroups();
           initTimedCheckBox();
-          extendedTimeInitialize();
           checkUncheckTimeBox();
           checkLastHandling();
         });
@@ -275,16 +342,11 @@
   </div>
 
   <div id="groupDiv" class="groupTable">
-    <h:selectBooleanCheckbox id="checkUncheckAllReleaseGroups" disabled="true" />
-    <h:outputText value="#{assessmentSettingsMessages.select_all_groups}" />
     <h:selectManyCheckbox id="groupsForSite" disabled="true"  layout="pagedirection" value="#{publishedSettings.groupsAuthorized}">
       <f:selectItems value="#{publishedSettings.groupsForSite}" />
     </h:selectManyCheckbox>
   </div>
   
-  <!-- Extended Time -->
-  <%@ include file="inc/publishedExtendedTime.jspf"%>
-
     <!-- NUMBER OF SUBMISSIONS -->
   <h:panelGroup styleClass="row" layout="block" rendered="#{publishedSettings.valueMap.submissionModel_isInstructorEditable==true}">
     <h:outputLabel styleClass="col-md-2" value="#{assessmentSettingsMessages.submissions_allowed}" />
@@ -363,7 +425,7 @@
       </div>
     </div>
   </h:panelGroup>
-  
+
   <!-- AUTOMATIC SUBMISSION -->
   <h:panelGroup styleClass="form-group row" layout="block" rendered="#{publishedSettings.valueMap.automaticSubmission_isInstructorEditable==true}">
     <h:outputLabel styleClass="col-md-2" value="#{assessmentSettingsMessages.auto_submit}" />
@@ -469,6 +531,11 @@
 </div><!-- This is the end of the sub-accordion -->
 
 </samigo:hideDivision><!-- END the Availabity and Submissions category -->
+
+<samigo:hideDivision title="#{assessmentSettingsMessages.heading_extended_time}" >
+  <!-- Extended Time -->
+  <%@ include file="inc/publishedExtendedTime.jspf"%>
+</samigo:hideDivision>
 
 <samigo:hideDivision title="#{assessmentSettingsMessages.heading_grading_feedback}" >
 
@@ -700,7 +767,7 @@
 <p class="act">
 
   <!-- Save button -->
-  <h:commandButton type="submit" value="#{commonMessages.action_save}" action="#{publishedSettings.getOutcome}"  styleClass="active" onclick="extendedTimeCombine();setBlockDivs();updateItemNavigation(false);" >
+  <h:commandButton type="submit" value="#{commonMessages.action_save}" action="#{publishedSettings.getOutcome}"  styleClass="active" onclick="setBlockDivs();updateItemNavigation(false);" >
       <f:actionListener type="org.sakaiproject.tool.assessment.ui.listener.author.SavePublishedSettingsListener" />
   </h:commandButton>
   

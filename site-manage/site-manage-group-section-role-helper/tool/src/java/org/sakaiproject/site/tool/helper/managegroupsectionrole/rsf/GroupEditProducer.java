@@ -1,31 +1,34 @@
+/**
+ * Copyright (c) 2003-2017 The Apereo Foundation
+ *
+ * Licensed under the Educational Community License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *             http://opensource.org/licenses/ecl2
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.sakaiproject.site.tool.helper.managegroupsectionrole.rsf;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.sakaiproject.authz.api.Member;
-import org.sakaiproject.authz.api.Role;
-import org.sakaiproject.site.api.Group;
-import org.sakaiproject.site.api.SiteService;
-import org.sakaiproject.site.tool.helper.managegroupsectionrole.impl.SiteManageGroupSectionRoleHandler;
-import org.sakaiproject.site.util.Participant;
-import org.sakaiproject.site.util.SiteComparator;
-import org.sakaiproject.site.util.SiteConstants;
-import org.sakaiproject.util.SortedIterator;
-import org.sakaiproject.user.api.User;
-import org.sakaiproject.user.api.UserDirectoryService;
-
-import org.sakaiproject.rsf.producers.FrameAdjustingProducer;
 import uk.org.ponder.messageutil.MessageLocator;
 import uk.org.ponder.messageutil.TargettedMessage;
 import uk.org.ponder.messageutil.TargettedMessageList;
@@ -39,8 +42,11 @@ import uk.org.ponder.rsf.components.UICommand;
 import uk.org.ponder.rsf.components.UIForm;
 import uk.org.ponder.rsf.components.UISelect;
 import uk.org.ponder.rsf.components.UIDeletionBinding;
+import uk.org.ponder.rsf.components.decorators.DecoratorList;
 import uk.org.ponder.rsf.components.decorators.UICSSDecorator;
+import uk.org.ponder.rsf.components.decorators.UIDecorator;
 import uk.org.ponder.rsf.components.decorators.UILabelTargetDecorator;
+import uk.org.ponder.rsf.components.decorators.UIDisabledDecorator;
 import uk.org.ponder.rsf.flow.ARIResult;
 import uk.org.ponder.rsf.flow.ActionResultInterceptor;
 import uk.org.ponder.rsf.view.ComponentChecker;
@@ -49,16 +55,29 @@ import uk.org.ponder.rsf.viewstate.SimpleViewParameters;
 import uk.org.ponder.rsf.viewstate.ViewParameters;
 import uk.org.ponder.rsf.viewstate.ViewParamsReporter;
 
+import org.sakaiproject.authz.api.Member;
+import org.sakaiproject.authz.api.Role;
+import org.sakaiproject.component.api.ServerConfigurationService;
+import org.sakaiproject.rsf.producers.FrameAdjustingProducer;
+import org.sakaiproject.site.api.Group;
+import org.sakaiproject.site.api.SiteService;
+import org.sakaiproject.site.tool.helper.managegroupsectionrole.impl.SiteManageGroupSectionRoleHandler;
+import org.sakaiproject.site.util.Participant;
+import org.sakaiproject.site.util.SiteComparator;
+import org.sakaiproject.site.util.SiteConstants;
+import org.sakaiproject.sitemanage.api.SiteManageConstants;
+import org.sakaiproject.util.SortedIterator;
+import org.sakaiproject.user.api.User;
+import org.sakaiproject.user.api.UserDirectoryService;
+
 /**
  * 
  * @author
  *
  */
+@Slf4j
 public class GroupEditProducer implements ViewComponentProducer, ActionResultInterceptor, ViewParamsReporter{
 
-	/** Our log (commons). */
-	private static final Logger M_log = LoggerFactory.getLogger(GroupEditProducer.class);
-	
     public SiteManageGroupSectionRoleHandler handler;
     public static final String VIEW_ID = "GroupEdit";
     public MessageLocator messageLocator;
@@ -80,8 +99,13 @@ public class GroupEditProducer implements ViewComponentProducer, ActionResultInt
 		this.userDirectoryService = userDirectoryService;
 	}
 
+	public ServerConfigurationService serverConfigurationService;
+	public void setServerConfigurationService(ServerConfigurationService serverConfigurationService)
+	{
+		this.serverConfigurationService = serverConfigurationService;
+	}
+
     public void fillComponents(UIContainer arg0, ViewParameters arg1, ComponentChecker arg2) {
-    	
     	String state="";
     	
     	// group
@@ -97,11 +121,16 @@ public class GroupEditProducer implements ViewComponentProducer, ActionResultInt
     	// group provider id
     	String groupProviderId = null;
     	// list of group role provider ids
-    	List<String> groupRoleProviderRoles = null;
+    	Collection<String> groupRoleProviderRoles = null;
     	
     	UIForm groupForm = UIForm.make(arg0, "groups-form");
 
-    	 String id = ((GroupEditViewParameters) arg1).id;
+    	String id = ((GroupEditViewParameters) arg1).id;
+    	Group filterGroup = null;
+    	if(StringUtils.isNotBlank(handler.filterByGroupId)) {
+			filterGroup = siteService.findGroup(handler.filterByGroupId);
+    	}
+
     	 if (id != null)
     	 {
     		 try
@@ -144,10 +173,10 @@ public class GroupEditProducer implements ViewComponentProducer, ActionResultInt
     		 }
     		 catch (Exception e)
     		 {
-    			 M_log.debug(this + "fillComponents: cannot get group id=" + id, e);
+    			 log.debug(this + "fillComponents: cannot get group id=" + id, e);
     		 }
     	 }
-    	 else
+    	 else if(StringUtils.isBlank(handler.filterByGroupId))
     	 {
     		 handler.resetParams();
     	 }
@@ -158,10 +187,15 @@ public class GroupEditProducer implements ViewComponentProducer, ActionResultInt
     	 
          UIOutput.make(groupForm, "prompt", headerText);
          UIOutput.make(groupForm, "emptyGroupTitleAlert", messageLocator.getMessage("editgroup.titlemissing"));
-         UIOutput.make(groupForm, "instructions", messageLocator.getMessage("editgroup.instruction", new Object[]{addUpdateButtonName}));
+         
+         if (g != null && g.isLocked()) {
+            UIOutput.make(groupForm, "instructions", messageLocator.getMessage("editgroup.notallowed", null)); 
+         } else {
+            UIOutput.make(groupForm, "instructions", messageLocator.getMessage("editgroup.instruction", new Object[]{addUpdateButtonName}));
+         }
          
          UIOutput.make(groupForm, "group_title_label", messageLocator.getMessage("group.title"));
-         UIInput.make(groupForm, "group_title", "#{SiteManageGroupSectionRoleHandler.title}",groupTitle);
+         UIInput groupTitleInput = UIInput.make(groupForm, "group_title", "#{SiteManageGroupSectionRoleHandler.title}",groupTitle);     
 		 
 		
 		 UIMessage groupDescrLabel = UIMessage.make(groupForm, "group_description_label", "group.description"); 
@@ -208,7 +242,6 @@ public class GroupEditProducer implements ViewComponentProducer, ActionResultInt
 		 UIBoundBoolean checkbox = UIBoundBoolean.make(joinableDiv, "allowPreviewMembership", "#{SiteManageGroupSectionRoleHandler.allowPreviewMembership}");
 		 UILabelTargetDecorator.targetLabel(UIMessage.make(joinableDiv, "allowPreviewMembership-label", "group.joinable.allowPreview"), checkbox);
 
-
 		 UIOutput.make(groupForm, "membership_label", messageLocator.getMessage("editgroup.membership"));
 		 UIOutput.make(groupForm, "membership_site_label", messageLocator.getMessage("editgroup.generallist"));
 		 UIOutput.make(groupForm, "membership_group_label", messageLocator.getMessage("editgroup.grouplist"));
@@ -229,45 +262,63 @@ public class GroupEditProducer implements ViewComponentProducer, ActionResultInt
 			 membersSelected = new ArrayList<>();
 		 }
 
-		 // add site roster
-		 for (String roster:siteRosters)
-		 {
-			 // not include in the group yet
-			 if ((groupProviderId == null || !groupProviderId.contains(roster)) && !membersSelected.contains( roster ))
+		 if(StringUtils.isBlank( handler.filterByGroupId )){
+			 // add site roster
+			 for (String roster:siteRosters)
 			 {
-				 siteMemberLabels.add( messageLocator.getMessage("group.section_prefix") + handler.getRosterLabel(roster) + " (" + roster + ")");
-				 siteMemberValues.add( roster );
+				 // not include in the group yet
+				 if ((groupProviderId == null || !groupProviderId.contains(roster)) && !membersSelected.contains( roster ))
+				 {
+					 siteMemberLabels.add( messageLocator.getMessage("group.section_prefix") + handler.getRosterLabel(roster) + " (" + roster + ")");
+					 siteMemberValues.add( roster );
+				 }
 			 }
-		 }
-		 // add site role
-		 for (Role role:siteRoles)
-		 {
-			 // not include in the group yet
-			 if ((groupRoleProviderRoles == null || !groupRoleProviderRoles.contains(role.getId())) && !membersSelected.contains( role.getId() ))
+			 // add site role
+			 for (Role role:siteRoles)
 			 {
-				 siteMemberLabels.add( messageLocator.getMessage("group.role_prefix") + role.getId() );
-				 siteMemberValues.add( role.getId() );
+				 // not include in the group yet
+				 if ((groupRoleProviderRoles == null || !groupRoleProviderRoles.contains(role.getId())) && !membersSelected.contains( role.getId() ))
+				 {
+					 siteMemberLabels.add( messageLocator.getMessage("group.role_prefix") + role.getId() );
+					 siteMemberValues.add( role.getId() );
+				 }
 			 }
-		 }
-		 // add site members to the list
-		 Iterator<Participant> sIterator = new SortedIterator(siteMembers.iterator(), new SiteComparator(SiteConstants.SORTED_BY_PARTICIPANT_NAME, Boolean.TRUE.toString()));
-	     while( sIterator.hasNext() ){
-	        	Participant p = (Participant) sIterator.next();
-	        	// not in the group yet
-	        	if ((g == null || g.getMember(p.getUniqname()) == null) && !membersSelected.contains( p.getUniqname() ))
-	        	{
-					siteMemberLabels.add( p.getName() + " (" + p.getDisplayId() + ")" );
-					siteMemberValues.add( p.getUniqname() );
-	        	}
-	        }
+			 
+			 // add site members to the list
+			 Iterator<Participant> sIterator = new SortedIterator(siteMembers.iterator(), new SiteComparator(SiteConstants.SORTED_BY_PARTICIPANT_NAME, Boolean.TRUE.toString()));
+			 while( sIterator.hasNext() ){
+					Participant p = (Participant) sIterator.next();
+					// not in the group yet
+					if ((g == null || g.getMember(p.getUniqname()) == null) && !membersSelected.contains( p.getUniqname() ))
+					{
+						siteMemberLabels.add( p.getName() + " (" + p.getDisplayId() + ")" );
+						siteMemberValues.add( p.getUniqname() );
+					}
+			 }
+		} else {
+			List<Member> filterGroupMembers = new ArrayList<>(filterGroup.getMembers());
+			Collections.sort(filterGroupMembers, new SiteComparator(SiteConstants.SORTED_BY_MEMBER_NAME, Boolean.TRUE.toString()));
+			for(Member m : filterGroupMembers){
+				if (!membersSelected.contains( m.getUserId() )){
+					String userId = m.getUserId();
+					 try {
+						 User u = userDirectoryService.getUser(userId);
+						 siteMemberLabels.add( u.getSortName() + " (" + u.getDisplayId() + ")" );
+						 siteMemberValues.add( userId );
+					 } catch (Exception e) {
+						 log.debug(this + ":fillComponents: cannot find user " + userId, e);
+					 }
+				}
+			}
+		}
 
-	     UISelect.makeMultiple( groupForm, "siteMembers", siteMemberValues.toArray( new String[siteMemberValues.size()] ), 
+	     UISelect siteMembersSelect = UISelect.makeMultiple( groupForm, "siteMembers", siteMemberValues.toArray( new String[siteMemberValues.size()] ), 
 	     	     	     	     siteMemberLabels.toArray( new String[siteMemberLabels.size()] ), 
 	     	     	     	     "#{SiteManageGroupSectionRoleHandler.selectedSiteMembers}", new String[] {} );
 
 	     /********************** for the group members list **************************/
 	     List<String> groupRosters = handler.getGroupRosters(g);
-	     List<String> groupProviderRoles = handler.getGroupProviderRoles(g);
+	     Collection<String> groupProviderRoles = handler.getGroupProviderRoles(g);
 	     List<Member> groupMembersCopy = new ArrayList<>();
 	     groupMembersCopy.addAll(groupMembers);
 	     for( Member p : groupMembersCopy )
@@ -284,7 +335,7 @@ public class GroupEditProducer implements ViewComponentProducer, ActionResultInt
         	}
         	catch (Exception e)
         	{
-        		M_log.debug(this + "fillInComponent: cannot find user with id " + userId, e);
+        		log.debug(this + "fillInComponent: cannot find user with id " + userId, e);
         		// need to remove the group member
         		groupMembers.remove(p);
         	}
@@ -327,7 +378,7 @@ public class GroupEditProducer implements ViewComponentProducer, ActionResultInt
 				 }
 				 catch (Exception e)
 				 {
-					 M_log.debug(this + ":fillComponents: cannot find user " + userId, e);
+					 log.debug(this + ":fillComponents: cannot find user " + userId, e);
 				 }
 			 }
 		 }
@@ -356,10 +407,10 @@ public class GroupEditProducer implements ViewComponentProducer, ActionResultInt
                 // Selected member...
                 else if( groupMembers != null )
                 {
-                    sIterator = new SortedIterator(siteMembers.iterator(), new SiteComparator(SiteConstants.SORTED_BY_PARTICIPANT_NAME, Boolean.TRUE.toString()));
-                    while( sIterator.hasNext() )
+                    Iterator<Participant> pIterator = new SortedIterator(siteMembers.iterator(), new SiteComparator(SiteConstants.SORTED_BY_PARTICIPANT_NAME, Boolean.TRUE.toString()));
+                    while( pIterator.hasNext() )
                     {
-                        Participant p = (Participant) sIterator.next();
+                        Participant p = (Participant) pIterator.next();
                         String userID = p.getUniqname();
                         if( StringUtils.isNotBlank( userID ) && userID.equals( memberID ) )
                         {
@@ -371,10 +422,9 @@ public class GroupEditProducer implements ViewComponentProducer, ActionResultInt
             }
         }
 
-         UISelect.make( groupForm, "groupMembers", groupMemberValues.toArray( new String[groupMemberValues.size()] ),
+         UISelect groupMembersSelect = UISelect.make( groupForm, "groupMembers", groupMemberValues.toArray( new String[groupMemberValues.size()] ),
                                                 groupMemberLabels.toArray( new String[groupMemberLabels.size()] ), null );
-    	 UICommand.make(groupForm, "save", addUpdateButtonName, "#{SiteManageGroupSectionRoleHandler.processAddGroup}");
-
+         UICommand saveButton = UICommand.make(groupForm, "save", addUpdateButtonName, "#{SiteManageGroupSectionRoleHandler.processAddGroup}");
          UICommand cancel = UICommand.make(groupForm, "cancel", messageLocator.getMessage("editgroup.cancel"), "#{SiteManageGroupSectionRoleHandler.processBack}");
          cancel.parameters.add(new UIDeletionBinding("#{destroyScope.resultScope}"));
          
@@ -382,6 +432,44 @@ public class GroupEditProducer implements ViewComponentProducer, ActionResultInt
          
          // hidden field for group id
          UIInput.make(groupForm, "groupId", "#{SiteManageGroupSectionRoleHandler.id}", groupId);
+		 
+         // allow group filter
+         boolean groupFilterEnabled = serverConfigurationService.getBoolean(SiteManageConstants.PROP_SITEINFO_GROUP_FILTER_ENABLED, true);// TODO cambiar a false
+         if(groupFilterEnabled){
+			UICommand auxButton = UICommand.make(groupForm, "filterButton", "filterButton", "#{SiteManageGroupSectionRoleHandler.processFilterGroup}");
+			UIBranchContainer UIgroupFilterEnabled = UIBranchContainer.make(groupForm, "groupFilterEnabled:");
+			
+			UIMessage.make(UIgroupFilterEnabled, "filterPlaceholder", "sinfo.filterPlaceholder");
+			UIMessage filterSetLabel = UIMessage.make(groupForm, "group_filter_set_label", "sinfo.filterbygroup");
+			List<SiteGroup> siteGroups = new ArrayList<>();
+			siteGroups.add(new SiteGroup("", messageLocator.getMessage("none"), -1));
+			for(Group group : handler.site.getGroups()){
+				int type = 0;
+				Object gProp = group.getProperties().getProperty(group.GROUP_PROP_WSETUP_CREATED);
+				if (gProp != null && gProp.equals(Boolean.TRUE.toString()))	{
+					type = 1;
+				}
+				String prefix = (type == 0) ? messageLocator.getMessage("group.section_prefix") : messageLocator.getMessage("group.group_prefix");
+				siteGroups.add(new SiteGroup(group.getId(), prefix + group.getTitle(), type));
+			}
+			Collections.sort(siteGroups, SiteGroup.COMPARE_BY_TYPE);
+			String[] filterSetNamesArr = siteGroups.stream().map(SiteGroup::getTitle).toArray(String[]::new);
+			String[] filterSetValuesArr = siteGroups.stream().map(SiteGroup::getId).toArray(String[]::new);
+            UISelect filterSetSelect = UISelect.make(UIgroupFilterEnabled, "filter-set", filterSetValuesArr,
+					 filterSetNamesArr, "SiteManageGroupSectionRoleHandler.filterByGroupId");
+            UILabelTargetDecorator.targetLabel(filterSetLabel, filterSetSelect);
+         }
+         
+         if (g != null && g.isLocked()) {
+            UIDisabledDecorator disable = new UIDisabledDecorator(true);
+            groupTitleInput.decorate(disable);
+            groupDescr.decorate(disable);
+            viewMemCheckbox.decorate(disable);
+            joinableSetSelect.decorate(disable);
+            siteMembersSelect.decorate(disable);
+            groupMembersSelect.decorate(disable);
+            saveButton.decorate(disable);
+         }
          
          //process any messages
          tml = handler.messages;
@@ -415,5 +503,36 @@ public class GroupEditProducer implements ViewComponentProducer, ActionResultInt
         if ("success".equals(actionReturn) || "cancel".equals(actionReturn)) {
             result.resultingView = new SimpleViewParameters(GroupListProducer.VIEW_ID);
         }
+    }
+
+    static class SiteGroup {
+        int type;
+        String id;
+        String title;
+
+        SiteGroup(String id, String title, int type){
+            this.id = id;
+            this.title = title;
+            this.type = type;
+        }
+
+        public String getId() {
+            return id;
+        }
+
+        public String getTitle() {
+            return title;
+        }
+
+        public static Comparator<SiteGroup> COMPARE_BY_TYPE = new Comparator<SiteGroup>() {
+            @Override
+            public int compare(SiteGroup g1, SiteGroup g2) {
+                int comp = Integer.compare(g1.type, g2.type);
+                if(comp != 0){
+                    return comp;
+                }
+                return g1.title.compareToIgnoreCase(g2.title);
+            }
+        };
     }
 }

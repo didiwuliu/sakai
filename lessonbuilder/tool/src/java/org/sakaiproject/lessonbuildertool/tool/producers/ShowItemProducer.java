@@ -1,3 +1,18 @@
+/**
+ * Copyright (c) 2003-2017 The Apereo Foundation
+ *
+ * Licensed under the Educational Community License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *             http://opensource.org/licenses/ecl2
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 /**********************************************************************************
  * $URL: $
  * $Id: $
@@ -18,7 +33,6 @@ import java.net.URLEncoder;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.sakaiproject.assignment.cover.AssignmentService;
 import org.sakaiproject.exception.IdUnusedException;
 import org.sakaiproject.exception.PermissionException;
 import org.sakaiproject.lessonbuildertool.SimplePage;
@@ -386,7 +400,12 @@ public class ShowItemProducer implements ViewComponentProducer, NavigationCaseRe
 		UIOutput.make(tofill, "error", messageLocator.getMessage("simplepage.not_available"));
 		return;
 	    }
-
+	    if(item != null && item.getType() == SimplePageItem.FORUM_SUMMARY) {
+		// get messageId, topicId and forumId from the parameters for the source url
+		source = myUrl()+ "/portal/tool/" + simplePageBean.getCurrentTool(simplePageBean.FORUMS_TOOL_ID)
+			+ "/discussionForum/message/dfViewThreadDirect.jsf?&messageId=" + params.getMessageId()
+			+ "&topicId=" + params.getTopicId() + "&forumId=" + params.getForumId();
+	    }
 	    if (source.startsWith("CREATE/")) {
 		if (source.startsWith("CREATE/ASSIGN/")) {
 		    List<UrlItem> createLinks = assignmentEntity.createNewUrls(simplePageBean);

@@ -18,7 +18,7 @@
 	<sakai:script contextBase="/messageforums-tool" path="/js/messages.js"/>
 	<sakai:script contextBase="/messageforums-tool" path="/js/datetimepicker.js"/>
 	<script type="text/javascript" src="/library/js/lang-datepicker/lang-datepicker.js"></script>
-	<link href="/library/webjars/jquery-ui/1.11.3/jquery-ui.min.css" rel="stylesheet" type="text/css" />
+	<link href="/library/webjars/jquery-ui/1.12.1/jquery-ui.min.css" rel="stylesheet" type="text/css" />
 	
 	<%
 	  	String thisId = request.getParameter("panel");
@@ -58,6 +58,18 @@
 		else
 		{
 			revealIDsToRoles.css("display", "none");
+		}
+	}
+
+	function toggleIncludeContentsInEmailsOption(checked) {
+		var includeContentsInEmails = $("#revise\\:includeContentsInEmailsContainer");
+		if (checked)
+		{
+			includeContentsInEmails.css("display", "");
+		}
+		else
+		{
+			includeContentsInEmails.css("display", "none");
 		}
 	}
 	</script>
@@ -122,7 +134,6 @@
 		<h:panelGroup rendered="#{! ForumTool.disableLongDesc}">
 				<h:outputText id="outputLabel2"   value="#{msgs.cdfm_fullDescription}" styleClass="labeled"/>
 			<sakai:inputRichText textareaOnly="#{PrivateMessagesTool.mobileSession}" rows="#{ForumTool.editorRows}" cols="132" id="topic_description" value="#{ForumTool.selectedTopic.topic.extendedDescription}">
-				<f:validateLength maximum="65000"/>
 			</sakai:inputRichText>
 		</h:panelGroup>
 		
@@ -243,11 +254,11 @@
                   <f:selectItem itemValue="true" itemLabel="#{msgs.cdfm_forum_avail_date}"/>
                </h:selectOneRadio>
                </h:panelGroup>
-               <h:panelGroup id="openDateSpan" styleClass="indnt2 openDateSpan  calWidget" style="display: #{ForumTool.selectedTopic.availabilityRestricted ? '' : 'none'}">
+               <h:panelGroup id="openDateSpan" styleClass="indnt2 openDateSpan  calWidget" style="display: #{ForumTool.selectedTopic.availabilityRestricted ? 'block' : 'none'}">
 
                	   <h:outputLabel value="#{msgs.openDate}: " for="openDate"/>
 
-	               <h:inputText id="openDate" styleClass="openDate2" value="#{ForumTool.selectedTopic.openDate}"/>
+	               <h:inputText id="openDate" styleClass="openDate" value="#{ForumTool.selectedTopic.openDate}"/>
 
 
               	</h:panelGroup>
@@ -269,6 +280,7 @@
 			<script type="text/javascript">
 			      localDatePicker({
 			      	input:'[id="revise:openDate"]', 
+			      	allowEmptyDate: true, 
 			      	ashidden: { iso8601: 'openDateISO8601' },
 			      	getval:'[id="revise:openDate"]',
 			      	useTime:1
@@ -276,11 +288,29 @@
 			      
 			      localDatePicker({
 			      	input:'[id="revise:closeDate"]', 
+			      	allowEmptyDate: true, 
 			      	ashidden: { iso8601: 'closeDateISO8601' },
 			      	getval: '[id="revise:closeDate"]',
 			      	useTime:1
 			      });
 			</script>
+
+			<h4><h:outputText value="#{msgs.cdfm_forum_notifications}"/></h4>
+			<div class="indnt1">
+				<p class="checkbox">
+					<h:selectBooleanCheckbox
+						title="allowEmailNotifications" value="#{ForumTool.selectedTopic.topicAllowEmailNotifications}"
+						id="topic_allow_email_notifications"
+						onclick='toggleIncludeContentsInEmailsOption(this.checked);resizeFrame();'>
+					</h:selectBooleanCheckbox> <h:outputLabel for="topic_allow_email_notifications" value="#{msgs.cdfm_allowEmailNotifications}" />
+				<t:htmlTag value="p" id="includeContentsInEmailsContainer" style="display: #{ForumTool.selectedTopic.topicAllowEmailNotifications ? '' : 'none'}" styleClass="checkbox indnt1">
+					<h:selectBooleanCheckbox
+						title="includeContentsInEmails" value="#{ForumTool.selectedTopic.topicIncludeContentsInEmails}"
+						id="topic_includeContentsInEmails">
+					</h:selectBooleanCheckbox> <h:outputLabel for="topic_includeContentsInEmails" value="#{msgs.cdfm_includeContentsInEmails}" />
+				</t:htmlTag>
+				</p>
+			</div>
 
 		<%--
 		   <h4><h:outputText  value="Confidential Responses"/></h4>
@@ -340,10 +370,15 @@
 				</h:panelGroup>
 				<div class="indnt1">
 					<h:panelGrid columns="1" columnClasses="longtext,checkbox" cellpadding="0" cellspacing="0" >
-						<h:panelGroup rendered="#{ForumTool.selectedTopic.topic.id==null && !empty ForumTool.siteGroups}">
-							<h:selectOneRadio layout="pageDirection" onclick="this.blur()" onchange="setAutoCreatePanel(this);" disabled="#{not ForumTool.editMode}" id="createTopicsForGroups" value="#{ForumTool.createTopicsForGroups}">
+						<h:panelGroup rendered="#{ForumTool.selectedTopic.topic.id==null && !empty ForumTool.siteGroups && !ForumTool.selectedForum.restrictPermissionsForGroups}">
+							<h:selectOneRadio layout="pageDirection" onclick="this.blur()" onchange="setAutoCreatePanel(this);" disabled="#{not ForumTool.editMode}" id="createTopicsForGroups" value="#{ForumTool.selectedTopic.restrictPermissionsForGroups}">
 								<f:selectItem itemValue="false" itemLabel="#{msgs.cdfm_create_one_topic}"/>
 								<f:selectItem itemValue="true" itemLabel="#{msgs.cdfm_autocreate_topics_for_groups}"/>
+							</h:selectOneRadio>
+						</h:panelGroup>
+						<h:panelGroup style="display:none" rendered="#{ForumTool.selectedTopic.topic.id==null && !empty ForumTool.siteGroups && ForumTool.selectedForum.restrictPermissionsForGroups}">
+							<h:selectOneRadio layout="pageDirection" onclick="this.blur()" onchange="setAutoCreatePanel(this);" disabled="#{not ForumTool.editMode}" id="createTopicsForGroups2" value="#{ForumTool.selectedTopic.restrictPermissionsForGroups}">
+								<f:selectItem itemValue="false" itemLabel="#{msgs.cdfm_create_one_topic}"/>
 							</h:selectOneRadio>
 						</h:panelGroup>
 					</h:panelGrid>
@@ -353,7 +388,7 @@
 				</div>
 
 				<div id="createTopicsForGroupsPanel" class="createTopicsForGroupsPanel" style="display:none" >
-				<h:panelGroup rendered="#{ForumTool.selectedTopic.topic.id==null && !empty ForumTool.siteGroups}"> 
+				<h:panelGroup rendered="#{ForumTool.selectedTopic.topic.id==null && !empty ForumTool.siteGroups && !ForumTool.selectedForum.restrictPermissionsForGroups}">
 					<h:outputText value="#{msgs.cdfm_autocreate_topics_desc}" rendered="#{ForumTool.selectedTopic.topic.id==null && !empty ForumTool.siteGroups}" />
 					<h:panelGroup styleClass="itemAction">
 						<h:outputLink value="#" style="text-decoration:none"  styleClass="instrWithGrades">
@@ -379,7 +414,7 @@
 <script type="text/javascript">
 setPanelId('<%= org.sakaiproject.util.Web.escapeJavascript(thisId)%>');
 $(function () {
-	if (<h:outputText value="#{ForumTool.selectedTopic.topic.id==null && !empty ForumTool.siteGroups && ForumTool.createTopicsForGroups}" />) {
+	if (<h:outputText value="#{ForumTool.selectedTopic.topic.id==null && !empty ForumTool.siteGroups && ForumTool.selectedTopic.restrictPermissionsForGroups}" />) {
 		$("#createOneTopicPanel").hide();
 		$("#createTopicsForGroupsPanel").show();
 	}

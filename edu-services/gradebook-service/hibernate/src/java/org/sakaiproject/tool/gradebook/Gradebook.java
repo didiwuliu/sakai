@@ -1,32 +1,27 @@
-/**********************************************************************************
-*
-* $Id$
-*
-***********************************************************************************
-*
- * Copyright (c) 2005, 2006, 2007, 2008 The Sakai Foundation, The MIT Corporation
+/**
+ * Copyright (c) 2003-2017 The Apereo Foundation
  *
  * Licensed under the Educational Community License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *       http://www.opensource.org/licenses/ECL-2.0
+ *             http://opensource.org/licenses/ecl2
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
-*
-**********************************************************************************/
+ */
 
 package org.sakaiproject.tool.gradebook;
 
 import java.io.Serializable;
-import java.util.*;
-import org.apache.commons.lang.builder.EqualsBuilder;
-import org.apache.commons.lang.builder.HashCodeBuilder;
-import org.apache.commons.lang.builder.ToStringBuilder;
+import java.util.Set;
+
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.commons.lang3.builder.ToStringBuilder;
 
 /**
  * A Gradebook is the top-level object in the Sakai Gradebook tool.  Only one
@@ -37,7 +32,10 @@ import org.apache.commons.lang.builder.ToStringBuilder;
  * @author <a href="mailto:jholtzman@berkeley.edu">Josh Holtzman</a>
  */
 public class Gradebook implements Serializable {
-    private Long id;
+    
+	private static final long serialVersionUID = 1L;
+	
+	private Long id;
     private String uid;
     private int version;
     private String name;
@@ -256,14 +254,16 @@ public class Gradebook implements Serializable {
       this.courseAverageDisplayed = courseAverageDisplayed;
     }
 
-    public String toString() {
+    @Override
+	public String toString() {
         return new ToStringBuilder(this).
         append("id", id).
         append("uid", uid).
         append("name", name).toString();
     }
 
-    public boolean equals(Object other) {
+    @Override
+	public boolean equals(Object other) {
         if (!(other instanceof Gradebook)) {
             return false;
         }
@@ -272,98 +272,95 @@ public class Gradebook implements Serializable {
 		    append(uid, gb.getUid()).isEquals();
     }
 
-    public int hashCode() {
+    @Override
+	public int hashCode() {
         return new HashCodeBuilder().
             append(uid).toHashCode();
     }
 
-		public int getCategory_type()
-		{
-			return category_type;
-		}
+	public int getCategory_type() {
+		return category_type;
+	}
 
-		public void setCategory_type(int category_type)
-		{
-			this.category_type = category_type;
-		}
+	public void setCategory_type(int category_type) {
+		this.category_type = category_type;
+	}
 
-		public int getGrade_type()
-		{
-			return grade_type;
-		}
+	public int getGrade_type() {
+		return grade_type;
+	}
 
-		public void setGrade_type(int grade_type)
-		{
-			this.grade_type = grade_type;
-		}
+	public void setGrade_type(int grade_type) {
+		this.grade_type = grade_type;
+	}
 
-		public Boolean isEqualWeightCategories() {
-			return equalWeightCategories;
-		}
+	public Boolean isEqualWeightCategories() {
+		return equalWeightCategories;
+	}
 
-		public void setEqualWeightCategories(Boolean equalWeightCategories) {
-			this.equalWeightCategories = equalWeightCategories;
-		}
+	public void setEqualWeightCategories(Boolean equalWeightCategories) {
+		this.equalWeightCategories = equalWeightCategories;
+	}
 
-		public Boolean isScaledExtraCredit() {
-			return scaledExtraCredit;
-		}
+	public Boolean isScaledExtraCredit() {
+		return scaledExtraCredit;
+	}
 
-		public void setScaledExtraCredit(Boolean scaledExtraCredit) {
-			this.scaledExtraCredit = scaledExtraCredit;
-		}
+	public void setScaledExtraCredit(Boolean scaledExtraCredit) {
+		this.scaledExtraCredit = scaledExtraCredit;
+	}
 
-		public Boolean getShowMean() {
-			return showMean;
-		}
+	public Boolean getShowMean() {
+		return showMean;
+	}
 
-		public void setShowMean(Boolean showMean) {
-			this.showMean = showMean;
-		}
+	public void setShowMean(Boolean showMean) {
+		this.showMean = showMean;
+	}
 
-		public Boolean getShowMedian() {
-			return showMedian;
-		}
+	public Boolean getShowMedian() {
+		return showMedian;
+	}
 
-		public void setShowMedian(Boolean showMedian) {
-			this.showMedian = showMedian;
-		}
+	public void setShowMedian(Boolean showMedian) {
+		this.showMedian = showMedian;
+	}
 
-		public Boolean getShowMode() {
-			return showMode;
-		}
+	public Boolean getShowMode() {
+		return showMode;
+	}
 
-		public void setShowMode(Boolean showMode) {
-			this.showMode = showMode;
-		}
+	public void setShowMode(Boolean showMode) {
+		this.showMode = showMode;
+	}
 
-		public Boolean getShowRank() {
-			return showRank;
-		}
+	public Boolean getShowRank() {
+		return showRank;
+	}
 
-		public void setShowRank(Boolean showRank) {
-			this.showRank = showRank;
-		}
+	public void setShowRank(Boolean showRank) {
+		this.showRank = showRank;
+	}
 
-		public Boolean getShowItemStatistics() {
-			return showItemStatistics;
-		}
+	public Boolean getShowItemStatistics() {
+		return showItemStatistics;
+	}
 
-		public void setShowItemStatistics(Boolean showItemStatistics) {
-			this.showItemStatistics = showItemStatistics;
-		}
+	public void setShowItemStatistics(Boolean showItemStatistics) {
+		this.showItemStatistics = showItemStatistics;
+	}
 
-		public Boolean getScaledExtraCredit() {
-			return scaledExtraCredit;
-		}
+	public Boolean getScaledExtraCredit() {
+		return scaledExtraCredit;
+	}
 
-		public Boolean getShowStatisticsChart() {
-			return showStatisticsChart;
-		}
+	public Boolean getShowStatisticsChart() {
+		return showStatisticsChart;
+	}
 
-		public void setShowStatisticsChart(Boolean showStatisticsChart) {
-			this.showStatisticsChart = showStatisticsChart;
-		}
+	public void setShowStatisticsChart(Boolean showStatisticsChart) {
+		this.showStatisticsChart = showStatisticsChart;
+	}
 
 	/**
 	 * If the course grade is displayed, should the letter grade be displayed?

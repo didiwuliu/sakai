@@ -25,6 +25,7 @@
     <property name="targettedMessageList" ref="targettedMessageList" />
     <property name="siteService" ref="org.sakaiproject.site.api.SiteService" />
     <property name="userDirectoryService" ref="org.sakaiproject.user.api.UserDirectoryService" />
+    <property name="serverConfigurationService" ref="org.sakaiproject.component.api.ServerConfigurationService" />
   </bean>
   
   <bean id="GroupAutoCreateProdcuer" 
@@ -51,7 +52,6 @@
     <property name="serverConfigurationService" ref="org.sakaiproject.component.api.ServerConfigurationService" />
     <property name="authzGroupService" ref="org.sakaiproject.authz.api.AuthzGroupService" />
     <property name="messages" ref="targettedMessageList" />
-    <property name="httpServletRequest" ref="httpServletRequest" />
     <property name="userDirectoryService" ref="org.sakaiproject.user.api.UserDirectoryService" />
     <property name="cms" ref="org.sakaiproject.coursemanagement.api.CourseManagementService" />
     <property name="messageLocator" ref="messageLocator"/>

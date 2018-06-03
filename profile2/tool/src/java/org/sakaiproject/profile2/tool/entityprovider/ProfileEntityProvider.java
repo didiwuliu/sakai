@@ -20,6 +20,7 @@ import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import javax.servlet.http.HttpServletResponse;
 
@@ -54,6 +55,7 @@ import org.sakaiproject.profile2.logic.ProfileLogic;
 import org.sakaiproject.profile2.logic.ProfileMessagingLogic;
 import org.sakaiproject.profile2.logic.SakaiProxy;
 import org.sakaiproject.profile2.model.BasicConnection;
+import org.sakaiproject.profile2.model.BasicPerson;
 import org.sakaiproject.profile2.model.Person;
 import org.sakaiproject.profile2.model.ProfileImage;
 import org.sakaiproject.profile2.model.UserProfile;
@@ -229,8 +231,7 @@ public class ProfileEntityProvider extends AbstractEntityProvider implements Cor
 		if(connections == null) {
 			throw new EntityException("Error retrieving connections for " + ref.getId(), ref.getReference());
 		}
-		ActionReturn actionReturn = new ActionReturn(connections);
-		return actionReturn;
+		return new ActionReturn(connections);
 	}
 		
 	@EntityCustomAction(action="friendStatus",viewKey=EntityView.VIEW_SHOW)
@@ -274,9 +275,11 @@ public class ProfileEntityProvider extends AbstractEntityProvider implements Cor
 	}
 	
 	@EntityCustomAction(action="formatted",viewKey=EntityView.VIEW_SHOW)
-	public Object getFormattedProfile(EntityReference ref) {
+	public Object getFormattedProfile(EntityReference ref, EntityView view) {
 			
 		//this allows a normal full profile to be returned formatted in HTML
+		
+		final boolean wantsOfficial = StringUtils.equals("official", view.getPathSegment(3)) ? true : false;
 		
 		//get the full profile 
 		UserProfile userProfile = (UserProfile) getEntity(ref);
@@ -285,7 +288,7 @@ public class ProfileEntityProvider extends AbstractEntityProvider implements Cor
 		String siteId = requestGetter.getRequest().getParameter("siteId");
 		
 		//convert UserProfile to HTML object
-		String formattedProfile = getUserProfileAsHTML(userProfile, siteId);
+		String formattedProfile = getUserProfileAsHTML(userProfile, siteId, wantsOfficial);
 		
 		//ActionReturn actionReturn = new ActionReturn("UTF-8", "text/html", entity);
 		ActionReturn actionReturn = new ActionReturn(Formats.UTF_8, Formats.HTML_MIME_TYPE, formattedProfile);
@@ -387,26 +390,67 @@ public class ProfileEntityProvider extends AbstractEntityProvider implements Cor
 
     @EntityCustomAction(action="incomingConnectionRequests", viewKey=EntityView.VIEW_SHOW)
 	public Object getIncomingConnectionRequests(EntityView view, EntityReference ref) {
-		
+
 		if(!sakaiProxy.isLoggedIn()) {
 			throw new SecurityException("You must be logged in to get the incoming connection list.");
 		}
-		
+
 		//convert input to uuid
 		String uuid = sakaiProxy.ensureUuid(ref.getId());
-		if(StringUtils.isBlank(uuid)) {
+		if (StringUtils.isBlank(uuid)) {
 			throw new EntityNotFoundException("Invalid user.", ref.getId());
 		}
 		
-		//get list of connection requests
-		List<Person> requests = connectionsLogic.getConnectionRequestsForUser(uuid);
-		if(requests == null) {
+		final List<BasicConnection> requests
+			= connectionsLogic.getConnectionRequestsForUser(uuid).stream().map(p -> {
+							BasicConnection bc = new BasicConnection();
+							bc.setUuid(p.getUuid());
+							bc.setDisplayName(p.getDisplayName());
+							bc.setEmail(p.getProfile().getEmail());
+                            bc.setProfileUrl(linkLogic.getInternalDirectUrlToUserProfile(p.getUuid()));
+							bc.setType(p.getType());
+							bc.setSocialNetworkingInfo(p.getProfile().getSocialInfo());
+							return bc;
+				}).collect(Collectors.toList());
+
+		if (requests == null) {
 			throw new EntityException("Error retrieving connection requests for " + ref.getId(), ref.getReference());
 		}
-		ActionReturn actionReturn = new ActionReturn(requests);
-		return actionReturn;
+		return new ActionReturn(requests);
 	}
-	
+
+	@EntityCustomAction(action="outgoingConnectionRequests", viewKey=EntityView.VIEW_SHOW)
+	public Object getOutgoingConnectionRequests(EntityView view, EntityReference ref) {
+
+		if (!sakaiProxy.isLoggedIn()) {
+			throw new SecurityException("You must be logged in to get the outgoing connection list.");
+		}
+
+		//convert input to uuid
+		String uuid = sakaiProxy.ensureUuid(ref.getId());
+		if (StringUtils.isBlank(uuid)) {
+			throw new EntityNotFoundException("Invalid user.", ref.getId());
+		}
+
+		final List<BasicConnection> requests
+			= connectionsLogic.getOutgoingConnectionRequestsForUser(uuid).stream().map(p -> {
+							BasicConnection bc = new BasicConnection();
+							bc.setUuid(p.getUuid());
+							bc.setDisplayName(p.getDisplayName());
+							bc.setEmail(p.getProfile().getEmail());
+                            bc.setProfileUrl(linkLogic.getInternalDirectUrlToUserProfile(p.getUuid()));
+							bc.setType(p.getType());
+							bc.setSocialNetworkingInfo(p.getProfile().getSocialInfo());
+							return bc;
+				}).collect(Collectors.toList());
+
+		if (requests == null) {
+			throw new EntityException("Error retrieving outgoing connection requests for " + uuid, ref.getReference());
+		}
+
+		return new ActionReturn(requests);
+	}
+
 	@EntityURLRedirect("/{prefix}/{id}/account")
 	public String redirectUserAccount(Map<String,String> vars) {
 		return "user/" + vars.get("id") + vars.get(TemplateParseUtil.DOT_EXTENSION);
@@ -416,7 +460,7 @@ public class ProfileEntityProvider extends AbstractEntityProvider implements Cor
 	/**
 	 * {@inheritDoc}
 	 */
-	private String getUserProfileAsHTML(UserProfile userProfile, String siteId) {
+	private String getUserProfileAsHTML(UserProfile userProfile, String siteId, boolean official) {
 		
 		//note there is no birthday in this field. we need a good way to get the birthday without the year. 
 		//maybe it needs to be stored in a separate field and treated differently. Or returned as a localised string.
@@ -429,7 +473,11 @@ public class ProfileEntityProvider extends AbstractEntityProvider implements Cor
 		
 			sb.append("<div class=\"profile2-profile-image\">");
 			sb.append("<img src=\"");
-			sb.append(userProfile.getImageUrl());
+			if (official) {
+				sb.append(imageLogic.getOfficialProfileImage(userProfile.getUserUuid(), siteId).getUrl());
+			} else {
+				sb.append(userProfile.getImageUrl());
+			}
 			sb.append("\" />");
 			sb.append("</div>");
 		

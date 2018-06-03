@@ -19,28 +19,33 @@
  *
  **********************************************************************************/
 
-
-
 package org.sakaiproject.tool.assessment.ui.bean.author;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import javax.faces.context.ExternalContext;
 import javax.faces.context.FacesContext;
 import javax.faces.model.SelectItem;
+
 import org.apache.commons.lang.StringUtils;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
+
+import org.sakaiproject.component.cover.ServerConfigurationService;
 import org.sakaiproject.tool.assessment.facade.AssessmentFacade;
 import org.sakaiproject.tool.assessment.facade.AssessmentTemplateFacade;
 import org.sakaiproject.tool.assessment.facade.PublishedAssessmentFacade;
 import org.sakaiproject.tool.assessment.ui.bean.authz.AuthorizationBean;
 import org.sakaiproject.tool.assessment.ui.listener.util.ContextUtil;
 import org.sakaiproject.util.ResourceLoader;
-import org.sakaiproject.component.cover.ServerConfigurationService;
 
 /**
  * General authoring information.
@@ -48,9 +53,9 @@ import org.sakaiproject.component.cover.ServerConfigurationService;
  *
  * @version $Id$
  */
+@Slf4j
 public class AuthorBean implements Serializable
 {
-  private static Logger log = LoggerFactory.getLogger(AuthorBean.class);
 
   /** Use serialVersionUID for interoperability. */
   private final static long serialVersionUID = 4216587136245498157L;
@@ -61,15 +66,17 @@ public class AuthorBean implements Serializable
   private String assessmentID;
   private String editPublishedAssessmentID;
   private AssessmentFacade assessment;
-  private ArrayList assessmentTemplateList;
-  private ArrayList assessments;
-  private ArrayList publishedAssessments;
-  private ArrayList inactivePublishedAssessments;
+  private List assessmentTemplateList;
+  private List assessments;
+  private List publishedAssessments;
+  private List allAssessments;
+  private List inactivePublishedAssessments;
+  private Map<String, String> groups;
   private SelectItem[] assessmentTemplates;
   private boolean showCompleteAssessment;
   private String totalPoints;
   private String currentSection;
-  private ArrayList sections;
+  private List sections;
   private String currentQuestionType;
   private TemplateBean settings;
   private String totalQuestions;
@@ -102,9 +109,9 @@ public class AuthorBean implements Serializable
   private boolean isAnyAssessmentRetractForEdit = false;
   private String assessCreationMode; // assessment build (1)or markup text (2)
 
-  private ArrayList<SelectItem> pendingActionList1;
-  private ArrayList<SelectItem> pendingActionList2;
-  private ArrayList<SelectItem> publishedActionList;
+  private List<SelectItem> pendingActionList1;
+  private List<SelectItem> pendingActionList2;
+  private List<SelectItem> publishedActionList;
   private Boolean removePubAssessmentsRestrictedAfterStarted;
   private boolean isGradeable;
   private boolean isEditable;
@@ -116,8 +123,10 @@ public class AuthorBean implements Serializable
   private String editPoolName;
   private String editPoolSectionName;
   private String editPoolSectionId;
+
+  private boolean groupFilterEnabled;
+
   /* ------------------------------------ /*
-  
   
   /**
    * @return the id
@@ -173,7 +182,7 @@ public class AuthorBean implements Serializable
     return assessmentTemplateId;
   }
 
-  public void setAssessmentTemplateList(ArrayList list){
+  public void setAssessmentTemplateList(List list){
     this.assessmentTemplateList = new ArrayList();
     try{
       for (int i=0; i<list.size();i++){
@@ -191,7 +200,7 @@ public class AuthorBean implements Serializable
     }
   }
 
-  public ArrayList getAssessmentTemplateList(){
+  public List getAssessmentTemplateList(){
     return assessmentTemplateList;
   }
 
@@ -200,30 +209,66 @@ public class AuthorBean implements Serializable
     return assessmentTemplates;
   }
 */
-  public void setAssessments(ArrayList assessments){
+  public void setAssessments(List assessments){
     this.assessments = assessments;
   }
 
-  public ArrayList getAssessments(){
+  public List getAssessments(){
     return assessments;
   }
 
-  public void setPublishedAssessments(ArrayList publishedAssessments){
+  public void setPublishedAssessments(List publishedAssessments){
     this.publishedAssessments = publishedAssessments;
   }
 
-  public ArrayList getPublishedAssessments(){
+  public List getPublishedAssessments(){
     return publishedAssessments;
   }
 
-  public void setInactivePublishedAssessments(ArrayList inactivePublishedAssessments){
+  public void setAllAssessments(List allAssessments) {
+    this.allAssessments = allAssessments;
+
+    if (this.isGroupFilterEnabled()) {
+      Map<String, String> groups = new HashMap<>();
+      for (Object assessment : allAssessments) {
+        if (assessment instanceof AssessmentFacade) {
+          AssessmentFacade assessmentFacade = (AssessmentFacade) assessment;
+          Map<String, String> assessmentGroups = assessmentFacade.getReleaseToGroups();
+          if (assessmentGroups != null) {
+            groups.putAll(assessmentGroups);
+          }
+        }
+
+        if (assessment instanceof PublishedAssessmentFacade) {
+          PublishedAssessmentFacade pubAssessmentFacade = (PublishedAssessmentFacade) assessment;
+          Map<String, String> assessmentGroups = pubAssessmentFacade.getReleaseToGroups();
+          if (assessmentGroups != null) {
+            groups.putAll(assessmentGroups);
+          }
+        }
+      }
+      this.groups = groups.entrySet().stream().sorted(Map.Entry.comparingByValue())
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,
+        (oldValue, newValue) -> oldValue, LinkedHashMap::new));
+    }
+  }
+
+  public List getAllAssessments(){
+    return allAssessments;
+  }
+
+  public void setInactivePublishedAssessments(List inactivePublishedAssessments){
     this.inactivePublishedAssessments = inactivePublishedAssessments;
   }
 
-  public ArrayList getInactivePublishedAssessments(){
+  public List getInactivePublishedAssessments(){
     return inactivePublishedAssessments;
   }
-  
+
+  public Map getGroups(){
+    return this.groups;
+  }
+
   /**
    * do we show the complete asseassement?
    * @return boolean
@@ -264,7 +309,7 @@ public class AuthorBean implements Serializable
    * ArrayList of SectionBeans
    * @return
    */
-  public ArrayList getSections()
+  public List getSections()
   {
     return sections;
   }
@@ -358,7 +403,7 @@ public class AuthorBean implements Serializable
    * set a list of SectionBeans
    * @param sections
    */
-  public void setSections(ArrayList sections)
+  public void setSections(List sections)
   {
     this.sections = sections;
   }
@@ -394,9 +439,9 @@ public class AuthorBean implements Serializable
    * @return ArrayList of model SelectItems
    */
 
-  public ArrayList getSectionSelectList()
+  public List getSectionSelectList()
   {
-    ArrayList list = new ArrayList();
+    List list = new ArrayList();
 
     if (sections == null) return list;
 
@@ -672,7 +717,7 @@ public class AuthorBean implements Serializable
 
   // Split pendingActionList into pendingActionList1 and pendingActionList2 because of "Publish"
   // "Publish" has to be show/hide depending on the question size. So we need to have two ActionList
-  public ArrayList<SelectItem> getPendingSelectActionList1()
+  public List<SelectItem> getPendingSelectActionList1()
   {
 	  if (pendingActionList1 != null) {
 		  return pendingActionList1;
@@ -687,7 +732,6 @@ public class AuthorBean implements Serializable
 	  boolean isDeleteAnyAssessment = authorizationBean.getDeleteAnyAssessment();
 	  boolean isDeleteOwnAssessment = authorizationBean.getDeleteOwnAssessment();
 
-	  pendingActionList1.add(new SelectItem("select", com.getString("action_select")));
 	  if (isEditAnyAssessment || isEditOwnAssessment) {
 		  pendingActionList1.add(new SelectItem("edit_pending", com.getString("edit_action")));
 		  pendingActionList1.add(new SelectItem("preview_pending", com.getString("action_preview")));
@@ -699,13 +743,10 @@ public class AuthorBean implements Serializable
 		  pendingActionList1.add(new SelectItem("duplicate", com.getString("action_duplicate")));
 		  pendingActionList1.add(new SelectItem("export", com.getString("export_action")));
 	  }
-	  if (isDeleteAnyAssessment || isDeleteOwnAssessment) {
-		  pendingActionList1.add(new SelectItem("remove_pending", com.getString("remove_action")));
-	  }
 	  return pendingActionList1;
   }
   
-  public ArrayList<SelectItem> getPendingSelectActionList2()
+  public List<SelectItem> getPendingSelectActionList2()
   {
 	  if (pendingActionList2 != null) {
 		  return pendingActionList2;
@@ -720,7 +761,6 @@ public class AuthorBean implements Serializable
 	  boolean isDeleteAnyAssessment = authorizationBean.getDeleteAnyAssessment();
 	  boolean isDeleteOwnAssessment = authorizationBean.getDeleteOwnAssessment();
 
-	  pendingActionList2.add(new SelectItem("select", com.getString("action_select")));
 	  if (isEditAnyAssessment || isEditOwnAssessment) {
 		  pendingActionList2.add(new SelectItem("edit_pending", com.getString("edit_action")));
 		  pendingActionList2.add(new SelectItem("preview_pending", com.getString("action_preview")));
@@ -730,9 +770,6 @@ public class AuthorBean implements Serializable
 		  pendingActionList2.add(new SelectItem("settings_pending", com.getString("settings_action")));
 		  pendingActionList2.add(new SelectItem("duplicate", com.getString("action_duplicate")));
 		  pendingActionList2.add(new SelectItem("export", com.getString("export_action")));
-	  }
-	  if (isDeleteAnyAssessment || isDeleteOwnAssessment) {
-		  pendingActionList2.add(new SelectItem("remove_pending", com.getString("remove_action")));
 	  }
 	  return pendingActionList2;
   }
@@ -780,7 +817,7 @@ public class AuthorBean implements Serializable
 	  this.removePubAssessmentsRestrictedAfterStarted = removePubAssessmentsRestrictedAfterStarted;
   }
 
-  public ArrayList<SelectItem> getPublishedSelectActionList()
+  public List<SelectItem> getPublishedSelectActionList()
   {
 	  if (publishedActionList != null) {
 		  return publishedActionList;
@@ -905,5 +942,13 @@ public class AuthorBean implements Serializable
 			  context.redirect("discrepancyInData");
 		  } catch (Exception e) {};
 	  }
+  }
+
+  public boolean isGroupFilterEnabled() {
+    return this.groupFilterEnabled;
+  }
+
+  public void setGroupFilterEnabled(boolean groupFilterEnabled) {
+    this.groupFilterEnabled = groupFilterEnabled;
   }
 }

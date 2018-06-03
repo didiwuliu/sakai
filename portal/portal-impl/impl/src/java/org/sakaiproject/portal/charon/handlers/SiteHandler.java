@@ -23,21 +23,20 @@ package org.sakaiproject.portal.charon.handlers;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Enumeration;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.Cookie;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.sakaiproject.authz.api.Role;
 import org.sakaiproject.authz.cover.SecurityService;
 import org.sakaiproject.thread_local.cover.ThreadLocalManager;
@@ -55,6 +54,8 @@ import org.sakaiproject.portal.api.PortalRenderContext;
 import org.sakaiproject.portal.api.SiteView;
 import org.sakaiproject.portal.api.StoredState;
 import org.sakaiproject.portal.charon.site.AllSitesViewImpl;
+import org.sakaiproject.portal.charon.site.PortalSiteHelperImpl;
+import org.sakaiproject.presence.api.PresenceService;
 import org.sakaiproject.tool.api.Tool;
 import org.sakaiproject.tool.api.ToolSession;
 import org.sakaiproject.tool.api.ToolManager;
@@ -77,12 +78,15 @@ import org.sakaiproject.portal.util.URLUtils;
 import org.sakaiproject.portal.util.ToolUtils;
 import org.sakaiproject.portal.util.ByteArrayServletResponse;
 import org.sakaiproject.util.Validator;
+import lombok.extern.slf4j.Slf4j;
+
 
 /**
  * @author ieb
  * @since Sakai 2.4
  * @version $Rev$
  */
+@Slf4j
 public class SiteHandler extends WorksiteHandler
 {
 
@@ -91,8 +95,6 @@ public class SiteHandler extends WorksiteHandler
 	private static final String INCLUDE_LOGO = "include-logo";
 
 	private static final String INCLUDE_TABS = "include-tabs";
-
-	private static final Logger log = LoggerFactory.getLogger(SiteHandler.class);
 
 	private static final String URL_FRAGMENT = "site";
 
@@ -123,7 +125,9 @@ public class SiteHandler extends WorksiteHandler
 
 	// SAK-27774 - We are going inline default but a few tools need a crutch 
 	// This is Sakai 11 only so please do not back-port or merge this default value
-	private static final String IFRAME_SUPPRESS_DEFAULT = ":all:sakai.rsf.evaluation";
+	private static final String IFRAME_SUPPRESS_DEFAULT = ":all:sakai.gradebook.gwt.rpc:com.rsmart.certification:sakai.melete:sakai.rsf.evaluation";
+
+	private static final long AUTO_FAVORITES_REFRESH_INTERVAL_MS = 30000;
 
 	public SiteHandler()
 	{
@@ -404,16 +408,19 @@ public class SiteHandler extends WorksiteHandler
 		session.removeAttribute(Portal.ATTR_SITE_PAGE + siteId);
 
 		// SAK-29138 - form a context sensitive title
+		List<String> providers = PortalSiteHelperImpl.getProviderIDsForSites(((List<Site>) Arrays.asList(new Site[] { site }))).get(site.getReference());
 		String title = ServerConfigurationService.getString("ui.service","Sakai") + " : "
-				+ portal.getSiteHelper().getUserSpecificSiteTitle( site, false );
+				+ portal.getSiteHelper().getUserSpecificSiteTitle(site, false, false, providers);
 
 		// Lookup the page in the site - enforcing access control
 		// business rules
 		SitePage page = portal.getSiteHelper().lookupSitePage(pageId, site);
 		if (page != null)
 		{
-			// store the last page visited
-			session.setAttribute(Portal.ATTR_SITE_PAGE + siteId, page.getId());
+			if (ServerConfigurationService.getBoolean("portal.rememberSitePage", true)) {
+				// store the last page visited
+				session.setAttribute(Portal.ATTR_SITE_PAGE + siteId, page.getId());
+			}
 			title += " : " + page.getTitle();
 		}
 
@@ -476,7 +483,7 @@ public class SiteHandler extends WorksiteHandler
 
 		// Note that this does not call includeTool()
 		PortalRenderContext rcontext = portal.startPageContext(siteType, title, site
-				.getSkin(), req);
+				.getSkin(), req, site);
 
 		if ( allowBuffer ) {
 			log.debug("Starting the buffer process...");
@@ -530,9 +537,11 @@ public class SiteHandler extends WorksiteHandler
 		if (SiteService.isUserSite(siteId)){
 			rcontext.put("siteTitle", rb.getString("sit_mywor") );
 			rcontext.put("siteTitleTruncated", rb.getString("sit_mywor") );
+			rcontext.put("isUserSite", true);
 		}else{
-			rcontext.put("siteTitle", Web.escapeHtml(site.getTitle()));
-			rcontext.put("siteTitleTruncated", portal.getSiteHelper().getUserSpecificSiteTitle( site, false ) );
+			rcontext.put("siteTitle", portal.getSiteHelper().getUserSpecificSiteTitle(site, false, true, providers));
+			rcontext.put("siteTitleTruncated", portal.getSiteHelper().getUserSpecificSiteTitle(site, true, false, providers));
+			rcontext.put("isUserSite", false);
 		}
 		
 		addLocale(rcontext, site, session.getUserId());
@@ -554,13 +563,24 @@ public class SiteHandler extends WorksiteHandler
 		try{
 			boolean presenceEvents = ServerConfigurationService.getBoolean("presence.events.log", true);
 			if (presenceEvents)
-				org.sakaiproject.presence.cover.PresenceService.setPresence(siteId + "-presence");
+				org.sakaiproject.presence.cover.PresenceService.setPresence(siteId + PresenceService.PRESENCE_SUFFIX);
 		}catch(Exception e){}
 		//End - log the visit into SAKAI_EVENT		
 
 		rcontext.put("currentUrlPath", Web.serverUrl(req) + req.getContextPath()
 				+ URLUtils.getSafePathInfo(req));
 
+		//Find any quick links ready for display in the top navigation bar,
+		//they can be set per site or for the whole portal.
+		if (userId != null) {
+			String skin = getSiteSkin(siteId);
+			String quickLinksTitle = portalService.getQuickLinksTitle(skin);
+			List<Map> quickLinks = portalService.getQuickLinks(skin);
+			if (CollectionUtils.isNotEmpty(quickLinks)) {
+				rcontext.put("quickLinksInfo", quickLinksTitle);
+				rcontext.put("quickLinks", quickLinks);
+			}
+		}
 		doSendResponse(rcontext, res, null);
 
 		StoredState ss = portalService.getStoredState();
@@ -591,9 +611,7 @@ public class SiteHandler extends WorksiteHandler
 			if (toolContextPath.contains(toolSegment)) {
 				toolId = toolContextPath.substring(toolContextPath.lastIndexOf(toolSegment)+toolSegment.length());
 				ToolConfiguration toolConfig = site.getToolForCommonId(toolId);
-				if (log.isDebugEnabled()) {
-					log.debug("trying to resolve page id from toolId: ["+toolId+"]");
-				}
+				log.debug("trying to resolve page id from toolId: [{}]", toolId);
 				if (toolConfig != null) {
 					pageId = toolConfig.getPageId();
 				}
@@ -626,6 +644,10 @@ public class SiteHandler extends WorksiteHandler
 	protected void includeSiteNav(PortalRenderContext rcontext, HttpServletRequest req,
 			Session session, String siteId)
 	{
+		if (session.getUserId() != null) {
+			refreshAutoFavorites(session);
+		}
+
 		if (rcontext.uses(INCLUDE_SITE_NAV))
 		{
 
@@ -668,6 +690,29 @@ public class SiteHandler extends WorksiteHandler
 			catch (Exception any)
 			{
 			}
+		}
+	}
+
+	final static String AUTO_FAVORITES_LAST_REFRESHED_TIME = "autoFavoritesLastRefreshedTime";
+
+	private void refreshAutoFavorites(Session session) {
+		Long lastRefreshTime = (Long)session.getAttribute(AUTO_FAVORITES_LAST_REFRESHED_TIME);
+
+		if (lastRefreshTime == null) {
+			lastRefreshTime = Long.valueOf(0);
+		}
+
+		long now = System.currentTimeMillis();
+
+		if ((now - lastRefreshTime) > AUTO_FAVORITES_REFRESH_INTERVAL_MS) {
+			// Fetch the list of favorites, which will in turn populate the auto favorites.
+			try {
+				new FavoritesHandler().userFavorites(session.getUserId());
+			} catch (Exception e) {
+				log.error(e.getMessage(), e);
+			}
+
+			session.setAttribute(AUTO_FAVORITES_LAST_REFRESHED_TIME, now);
 		}
 	}
 
@@ -838,11 +883,13 @@ public class SiteHandler extends WorksiteHandler
 			rcontext.put("roleSwitchState", roleswitchstate); // this will tell our UI if we are in a role swapped state or not
 
 			int tabDisplayLabel = 1;
-			
+			boolean toolsCollapsed = false;
+
 			if (loggedIn) 
 			{
 				Preferences prefs = PreferencesService.getPreferences(session.getUserId());
-				ResourceProperties props = prefs.getProperties("sakai:portal:sitenav");
+				ResourceProperties props = prefs.getProperties(org.sakaiproject.user.api.PreferencesService.SITENAV_PREFS_KEY);
+
 				try 
 				{
 					tabDisplayLabel = (int) props.getLongProperty("tab:label");
@@ -851,9 +898,14 @@ public class SiteHandler extends WorksiteHandler
 				{
 					tabDisplayLabel = 1;
 				}
+
+				try {
+					toolsCollapsed = props.getBooleanProperty("toolsCollapsed");
+				} catch (Exception any) {}
 			}
-			
+
 			rcontext.put("tabDisplayLabel", tabDisplayLabel);
+			rcontext.put("toolsCollapsed", Boolean.valueOf(toolsCollapsed));
 			
 			SiteView siteView = portal.getSiteHelper().getSitesView(
 					SiteView.View.DHTML_MORE_VIEW, req, session, siteId);
@@ -1029,73 +1081,95 @@ public class SiteHandler extends WorksiteHandler
 				Matcher mc = p.matcher(contentType.toLowerCase());
 				if ( mc.find() ) return bufferedResponse;
 			}
-		} catch (ToolException e) {
-			e.printStackTrace();
-			return Boolean.FALSE;
-		} catch (IOException e) {
-			e.printStackTrace();
+		} catch (ToolException | IOException e) {
+			log.warn("Failed to buffer content.", e);
 			return Boolean.FALSE;
 		}
+		String tidAllow = ServerConfigurationService.getString(LEGACY_IFRAME_SUPPRESS_PROP, IFRAME_SUPPRESS_DEFAULT);
+		tidAllow = ServerConfigurationService.getString(IFRAME_SUPPRESS_PROP, tidAllow);
+		boolean debug = tidAllow.contains(":debug:");
 
 		String responseStr = bufferedResponse.getInternalBuffer();
 		if (responseStr == null || responseStr.length() < 1) return Boolean.FALSE;
 
-		String responseStrLower = responseStr.toLowerCase();
-		int headStart = responseStrLower.indexOf("<head");
-		headStart = findEndOfTag(responseStrLower, headStart);
-		int headEnd = responseStrLower.indexOf("</head");
-		int bodyStart = responseStrLower.indexOf("<body");
-		bodyStart = findEndOfTag(responseStrLower, bodyStart);
+		PageParts pp = parseHtmlParts(responseStr, debug);
+		if (pp != null)
+		{
+			if (debug)
+			{
+				log.info(" ---- Head --- ");
+				log.info(pp.head);
+				log.info(" ---- Body --- ");
+				log.info(pp.body);
+			}
+			Map<String, String> m = new HashMap<>();
+			m.put("responseHead", pp.head);
+			m.put("responseBody", pp.body);
+			log.debug("responseHead {} bytes, responseBody {} bytes",
+					pp.head.length(), pp.body.length());
+			return m;
+		}
+		log.debug("bufferContent could not find head/body content");
+		return bufferedResponse;
+	}
 
-		// Some tools (Blogger for example) have multiple 
+	/**
+	 * Simple tuple so a method can return both a head and body.
+	 */
+	static class PageParts {
+		String head;
+		String body;
+	}
+
+	/**
+	 * Attempts to find the HTML head and body in the document and return them back.
+	 * @param responseStr The HTML to be parse
+	 * @param debug If <code>true</code> then log where we found the head and body.
+	 *
+	 * @return <code>null</code> if we failed to parse the page or a PageParts object.
+	 */
+	PageParts parseHtmlParts(String responseStr, boolean debug) {
+		// We can't lowercase the string and search in it as then the offsets don't match when a character is a
+		// different length in upper and lower case
+		int headStart = StringUtils.indexOfIgnoreCase(responseStr, "<head");
+		headStart = findEndOfTag(responseStr, headStart);
+		int headEnd = StringUtils.indexOfIgnoreCase(responseStr, "</head");
+		int bodyStart = StringUtils.indexOfIgnoreCase(responseStr, "<body");
+		bodyStart = findEndOfTag(responseStr, bodyStart);
+
+		// Some tools (Blogger for example) have multiple
 		// head-body pairs - browsers seem to not care much about
 		// this so we will do the same - so that we can be
 		// somewhat clean - we search for the "last" end
 		// body tag - for the normal case there will only be one
-		int bodyEnd = responseStrLower.lastIndexOf("</body");
-		// If there is no body end at all or it is before the body 
+		int bodyEnd = StringUtils.indexOfIgnoreCase(responseStr, "</body");
+		// If there is no body end at all or it is before the body
 		// start tag we simply - take the rest of the response
-		if ( bodyEnd < bodyStart ) bodyEnd = responseStrLower.length() - 1;
+		if ( bodyEnd < bodyStart ) bodyEnd = responseStr.length() - 1;
 
-		String tidAllow = ServerConfigurationService.getString(LEGACY_IFRAME_SUPPRESS_PROP, IFRAME_SUPPRESS_DEFAULT);
-		tidAllow = ServerConfigurationService.getString(IFRAME_SUPPRESS_PROP, tidAllow);
-		if( tidAllow.indexOf(":debug:") >= 0 )
+		if(debug)
 			log.info("Frameless HS="+headStart+" HE="+headEnd+" BS="+bodyStart+" BE="+bodyEnd);
 
 		if (bodyEnd > bodyStart && bodyStart > headEnd && headEnd > headStart
-				&& headStart > 1)
-		{
-			Map m = new HashMap<String,String> ();
-			String headString = responseStr.substring(headStart + 1, headEnd);
-			
-			// SAK-29908 
+				&& headStart > 1) {
+			PageParts pp = new PageParts();
+			pp.head = responseStr.substring(headStart + 1, headEnd);
+
+			// SAK-29908
 			// Titles come twice to view and tool title overwrites main title because
 			// it is printed before.
 
-			int titleStart = headString.indexOf("<title");
-			int titleEnd = headString.indexOf("</title");
-			titleEnd = findEndOfTag(headString, titleEnd);
-			
-			headString = (titleStart != -1 && titleEnd != -1)?headString.substring(0, titleStart) + headString.substring(titleEnd + 1):headString;
+			int titleStart = pp.head.indexOf("<title");
+			int titleEnd = pp.head.indexOf("</title");
+			titleEnd = findEndOfTag(pp.head, titleEnd);
+
+			pp.head = (titleStart != -1 && titleEnd != -1) ? pp.head.substring(0, titleStart) + pp.head.substring(titleEnd + 1) : pp.head;
 			// End SAK-29908
-			
-			String bodyString = responseStr.substring(bodyStart + 1, bodyEnd);
-			if (tidAllow.indexOf(":debug:") >= 0)
-			{
-				log.info(" ---- Head --- ");
-				log.info(headString);
-				log.info(" ---- Body --- ");
-				log.info(bodyString);
-			}
-			m.put("responseHead", headString);
-			m.put("responseBody", bodyString);
-			log.debug("responseHead "+headString.length()+
-					" bytes, responseBody "+bodyString.length()+" bytes");
-			return m;
+
+			pp.body = responseStr.substring(bodyStart + 1, bodyEnd);
+			return pp;
 		}
-		log.debug("bufferContent could not find head/body content");
-		// log.debug(responseStr);
-		return bufferedResponse;
+		return null;
 	}
 
 	private int findEndOfTag(String string, int startPos)

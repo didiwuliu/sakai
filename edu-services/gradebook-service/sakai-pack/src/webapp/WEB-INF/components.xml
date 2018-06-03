@@ -65,6 +65,8 @@
 			<ref bean="org_sakaiproject_tool_gradebook_facades_Authn" />
 		</property>
 		<property name="eventTrackingService" ref="org_sakaiproject_tool_gradebook_facades_EventTrackingService" />
+		<property name="toolManager" ref="org.sakaiproject.tool.api.ToolManager" />
+		<property name="siteService" ref="org.sakaiproject.site.api.SiteService" />
 		<!-- This would be a circular dependency, so for now, we get it from the ComponentManager. -->
 		<!-- <property name="gradebookService" ref="org_sakaiproject_service_gradebook_GradebookService" /> -->
 	</bean>
@@ -184,6 +186,7 @@
 		<property name="gradebookFrameworkService" ref="org.sakaiproject.service.gradebook.GradebookFrameworkService"/>
 
 		<!-- Set up default system-wide grading scales. -->
+		<!-- Note that this is not currently used and is out of date -->
 <!--
 		<property name="availableGradingScales">
 			<list>
@@ -207,7 +210,7 @@
 							<value>F</value>
 						</list>
 					</property>
-					<property name="defaultBottomPercents">
+					<property name="defaultBottomPercentsAsList">
 						<list>
 							<value>100.0</value>
 							<value>95.0</value>
@@ -237,7 +240,7 @@
 							<value>F</value>
 						</list>
 					</property>
-					<property name="defaultBottomPercents">
+					<property name="defaultBottomPercentsAsList">
 						<list>
 							<value>90.0</value>
 							<value>80.0</value>
@@ -294,7 +297,7 @@
 							<value>F!?</value>
 						</list>
 					</property>
-					<property name="defaultBottomPercents">
+					<property name="defaultBottomPercentsAsList">
 						<list>
 							<value>100.0</value>
 							<value>90.0</value>
@@ -320,7 +323,7 @@
 							<value>F</value>
 						</list>
 					</property>
-					<property name="defaultBottomPercents">
+					<property name="defaultBottomPercentsAsList">
 						<list>
 							<value>50.0</value>
 							<value>30.0</value>
@@ -340,7 +343,7 @@
 							<value>I</value>
 						</list>
 					</property>
-					<property name="defaultBottomPercents">
+					<property name="defaultBottomPercentsAsList">
 						<list>
 							<value>75.0</value>
 							<value>0.0</value>

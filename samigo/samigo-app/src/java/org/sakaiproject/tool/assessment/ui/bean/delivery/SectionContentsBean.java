@@ -19,8 +19,6 @@
  *
  **********************************************************************************/
 
-
-
 package org.sakaiproject.tool.assessment.ui.bean.delivery;
 
 import java.io.Serializable;
@@ -37,9 +35,8 @@ import java.util.Set;
 
 import javax.faces.model.SelectItem;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.commons.math3.util.Precision;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
@@ -56,17 +53,14 @@ import org.sakaiproject.util.ResourceLoader;
  * <p>This bean represents a Part in an assessment </p>
  */
 
+@Slf4j
 public class SectionContentsBean
   implements Serializable
 {
-  /**
-	 * 
-	 */
 	private static final long serialVersionUID = 5959692528847396966L;
-	private static Logger log = LoggerFactory.getLogger(SectionContentsBean.class);
 	private String text;
 	private String nonDefaultText;
-  private java.util.ArrayList itemContents;
+  private List itemContents;
   private String sectionId;
   private String number;
   private double maxPoints;
@@ -76,7 +70,7 @@ public class SectionContentsBean
   private String numParts;
   private String description;
   private int unansweredQuestions; // ItemContentsBeans
-  private ArrayList questionNumbers = new ArrayList();
+  private List questionNumbers = new ArrayList();
 
   // added section Type , question ordering
   private Integer sectionAuthorType;
@@ -234,7 +228,7 @@ public class SectionContentsBean
    * Contents of part.
    * @return item contents of part.
    */
-  public java.util.ArrayList getItemContents()
+  public List getItemContents()
   {
     /*
         if( (sectionAuthorType!= null) && (sectionAuthorType.equals(SectionDataIfc.RANDOM_DRAW_FROM_QUESTIONPOOL) ))
@@ -247,10 +241,10 @@ public class SectionContentsBean
     return itemContents;
   }
 
-  public java.util.ArrayList getItemContentsForRandomDraw()
+  public List getItemContentsForRandomDraw()
   {
     // same ordering for each student
-    ArrayList randomsample = new ArrayList();
+    List randomsample = new ArrayList();
     long seed = (long) AgentFacade.getAgentString().hashCode();
     Collections.shuffle(itemContents, new Random(seed));
     int samplesize = numberToBeDrawn.intValue();
@@ -261,7 +255,7 @@ public class SectionContentsBean
     return randomsample;
   }
 
-  public java.util.ArrayList getItemContentsForRandomQuestionOrdering()
+  public List getItemContentsForRandomQuestionOrdering()
   {
     // same ordering for each student
     long seed = (long) AgentFacade.getAgentString().hashCode();
@@ -273,7 +267,7 @@ public class SectionContentsBean
    * Contents of part.
    * @param itemContents item contents of part.
    */
-  public void setItemContents(java.util.ArrayList itemContents)
+  public void setItemContents(List itemContents)
   {
     this.itemContents = itemContents;
   }
@@ -339,7 +333,7 @@ public class SectionContentsBean
     this.title = title;
   }
 
-  public ArrayList getQuestionNumbers()
+  public List getQuestionNumbers()
   {
     return questionNumbers;
   }
@@ -393,7 +387,7 @@ public class SectionContentsBean
     }
     catch (Exception e)
     {
-      e.printStackTrace();
+      log.error(e.getMessage(), e);
       throw new RuntimeException(e);
     }
   }

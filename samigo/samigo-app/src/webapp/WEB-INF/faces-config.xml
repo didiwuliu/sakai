@@ -368,6 +368,10 @@
 	    <property-name>showImageMapQuestion</property-name>
 	    <value>true</value>
 	  </managed-property>
+      <managed-property>
+        <property-name>showSearchQuestion</property-name>
+        <value>true</value>
+      </managed-property>
   </managed-bean>
   <managed-bean>
     <description>For authorization</description>
@@ -454,6 +458,12 @@
     <managed-bean-scope>session</managed-bean-scope>
   </managed-bean>
   <managed-bean>
+      <description>For author: Search Questions backing bean.</description>
+      <managed-bean-name>searchQuestionBean</managed-bean-name>
+      <managed-bean-class>org.sakaiproject.tool.assessment.ui.bean.author.SearchQuestionBean</managed-bean-class>
+      <managed-bean-scope>session</managed-bean-scope>
+  </managed-bean>
+    <managed-bean>
     <description>For delivery: Delivery backing bean.</description>
     <managed-bean-name>delivery</managed-bean-name>
     <managed-bean-class>org.sakaiproject.tool.assessment.ui.bean.delivery.DeliveryBean</managed-bean-class>
@@ -631,6 +641,10 @@
       <value>#{itemauthor}</value>
     </managed-property>
     <managed-property>
+      <property-name>authorizationBean</property-name>
+      <value>#{authorization}</value>
+    </managed-property>
+    <managed-property>
       <property-name>questionPoolBean</property-name>
       <value>#{questionpool}</value>
     </managed-property>    
@@ -648,6 +662,10 @@
     <managed-property>
       <property-name>authorBean</property-name>
       <value>#{author}</value>
+    </managed-property>
+    <managed-property>
+      <property-name>authorizationBean</property-name>
+      <value>#{authorization}</value>
     </managed-property>
   </managed-bean>
   <managed-bean>
@@ -764,6 +782,10 @@
       <to-view-id>/jsf/author/authorIndex_container.jsp</to-view-id>
     </navigation-case>
     <navigation-case>
+      <from-outcome>removeError</from-outcome>
+      <to-view-id>/jsf/author/authorIndex_container.jsp</to-view-id>
+    </navigation-case>
+    <navigation-case>
       <from-outcome>sortCore</from-outcome>
       <to-view-id>/jsf/author/authorIndex_container.jsp</to-view-id>
     </navigation-case>
@@ -837,6 +859,10 @@
 
 
   <!-- AUTHOR -->
+    <navigation-case>
+      <from-outcome>createAssessmentTitle</from-outcome>
+      <to-view-id>/jsf/author/createAssessment_title.jsp</to-view-id>
+    </navigation-case>
     <navigation-case>
       <from-outcome>createAssessment</from-outcome>
       <to-view-id>/jsf/author/editAssessment.jsp</to-view-id>
@@ -918,16 +944,8 @@
       <to-view-id>/jsf/author/confirmEditPublishedAssessment.jsp</to-view-id>
     </navigation-case>
     <navigation-case>
-      <from-outcome>confirmRemoveAssessment</from-outcome>
-      <to-view-id>/jsf/author/removeAssessment.jsp</to-view-id>
-    </navigation-case>
-    <navigation-case>
       <from-outcome>confirmCopyAssessment</from-outcome>
       <to-view-id>/jsf/author/confirmCopyAssessment.jsp</to-view-id>
-    </navigation-case>
-    <navigation-case>
-      <from-outcome>confirmRemovePublishedAssessment</from-outcome>
-      <to-view-id>/jsf/author/removePublishedAssessment.jsp</to-view-id>
     </navigation-case>
     <navigation-case>
       <from-outcome>confirmRemovePart</from-outcome>
@@ -968,6 +986,7 @@
     <navigation-case>
       <from-outcome>removeAssessment</from-outcome>
       <to-view-id>/jsf/author/authorIndex_container.jsp</to-view-id>
+      <redirect/>
     </navigation-case>
     <navigation-case>
       <from-outcome>removeMatchItem</from-outcome>
@@ -992,10 +1011,6 @@
     <navigation-case>
       <from-outcome>publishAssessment</from-outcome>
       <to-view-id>/jsf/author/authorIndex_container.jsp</to-view-id>
-    </navigation-case>
-    <navigation-case>
-      <from-outcome>confirmRemoveItemAttachment</from-outcome>
-      <to-view-id>/jsf/author/removeItemAttachment.jsp</to-view-id>
     </navigation-case>
     <navigation-case>
       <from-outcome>confirmRemovePartAttachment</from-outcome>
@@ -1066,6 +1081,10 @@
     <navigation-case>
       <from-outcome>matrixChoicesSurveyItem</from-outcome>
       <to-view-id>/jsf/author/item/matrixChoicesSurvey.jsp</to-view-id>
+    </navigation-case>
+    <navigation-case>
+      <from-outcome>searchQuestion</from-outcome>
+      <to-view-id>/jsf/author/searchQuestion.jsp</to-view-id>
     </navigation-case>
 
   <!-- QUESTION POOL	 -->

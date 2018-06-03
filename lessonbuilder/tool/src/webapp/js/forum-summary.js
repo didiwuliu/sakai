@@ -24,10 +24,10 @@ function showForums(forumsUrl, toolHref, itemsToShow, forumSummaryDiv  ){
 			success: function(data) {
 				$(data["forums_collection"]).each(function(fc_index, fc_value){
 					var author;
-					if(fc_value['modifiedBy'].indexOf('(') > -1){
-						author = fc_value['modifiedBy'].split('(')[0];
+					if(fc_value['createdBy'].indexOf('(') > -1){
+						author = fc_value['createdBy'].split('(')[0];
 					}else{
-						author = fc_value['modifiedBy'];
+						author = fc_value['createdBy'];
 					}
 					//escape markup
 					var entityTitle = fc_value['entityTitle'].replace(/&/g, '&amp;').replace(/>/g, '&gt;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
@@ -54,7 +54,7 @@ function showForums(forumsUrl, toolHref, itemsToShow, forumSummaryDiv  ){
 }
 function outputForums(messagesArray, toolHref, forumSummaryDiv){
 	var title = msg("simplepage.forum-header-title");
-	var text_for_forums = '<div class="forumSummaryHeaderDiv"><h3 class="forumSummaryHeader"><span aria-hidden="true" class="fa-item-text icon-sakai-forums"></span><a href="'+toolHref+'" class="forumSummaryLink" title ="'+title+'">'+title+'</a></h3></div>';
+	var text_for_forums = '<div class="forumSummaryHeaderDiv"><h3 class="forumSummaryHeader"><span aria-hidden="true" class="fa-item-text icon-sakai--sakai-forums"></span><a href="'+toolHref+'" class="forumSummaryLink" title ="'+title+'">'+title+'</a></h3></div>';
 	if(messagesArray.length == 0){
 		text_for_forums += '<p>'+msg("simplepage.forum-summary-no-message")+'</p>';
 	}

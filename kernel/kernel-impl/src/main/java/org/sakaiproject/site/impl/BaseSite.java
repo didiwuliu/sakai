@@ -33,9 +33,15 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.Vector;
 
-import org.apache.commons.lang.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
+
+import org.apache.commons.lang3.StringUtils;
+
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+
 import org.sakaiproject.authz.api.AuthzGroup;
 import org.sakaiproject.authz.api.AuthzGroupService;
 import org.sakaiproject.authz.api.GroupNotDefinedException;
@@ -61,25 +67,18 @@ import org.sakaiproject.user.api.UserDirectoryService;
 import org.sakaiproject.user.api.UserNotDefinedException;
 import org.sakaiproject.util.BaseResourceProperties;
 import org.sakaiproject.util.BaseResourcePropertiesEdit;
-import org.sakaiproject.util.StringUtil;
 import org.sakaiproject.util.Validator;
 import org.sakaiproject.util.Web;
 import org.sakaiproject.util.Xml;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 
 /**
  * <p>
  * BaseSite is a base implementation of the Site API Site.
  * </p>
  */
+@Slf4j
 public class BaseSite implements Site
 {
-	/** Our log (commons). */
-	private static Logger M_log = LoggerFactory.getLogger(BaseSite.class);
-
 	/** A fixed class serian number. */
 	private static final long serialVersionUID = 1L;
 
@@ -638,21 +637,21 @@ public class BaseSite implements Site
 		if (this.siteService == null) {
 			this.siteService = (BaseSiteService) ComponentManager.get(SiteService.class);
 			if (this.siteService == null) {
-				M_log.error("Cannot set the SiteService when set from BaseSite");
+				log.error("Cannot set the SiteService when set from BaseSite");
 			}
 		}
 		sessionManager = other.sessionManager;
 		if (this.sessionManager == null) {
 			this.sessionManager = (SessionManager) ComponentManager.get(SessionManager.class);
 			if (this.sessionManager == null) {
-				M_log.error("Cannot set the SessionManager when set from BaseSite");
+				log.error("Cannot set the SessionManager when set from BaseSite");
 			}
 		}
 		userDirectoryService = other.userDirectoryService;
 		if (this.userDirectoryService == null) {
 			this.userDirectoryService = (UserDirectoryService) ComponentManager.get(UserDirectoryService.class);
 			if (this.userDirectoryService == null) {
-				M_log.error("Cannot set the UserDirectoryService when set from BaseSite");
+				log.error("Cannot set the UserDirectoryService when set from BaseSite");
 			}
 		}
 
@@ -695,12 +694,12 @@ public class BaseSite implements Site
 				.setLazy(((BaseResourceProperties) pOther).isLazy());
 
 		// deep copy the pages, but avoid triggering fetching by passing false to getPages
-		m_pages = new ResourceVector();
-		for (Iterator iPages = other.getPages(false).iterator(); iPages.hasNext();)
-		{
-			BaseSitePage page = (BaseSitePage) iPages.next();
-			m_pages.add(new BaseSitePage(siteService,page, this, exact));
+		List<BaseSitePage> otherPages = new ArrayList<BaseSitePage>(other.getPages(false));
+		List<BaseSitePage> copiedPages = new ArrayList<BaseSitePage>(otherPages.size());
+		for (BaseSitePage page : otherPages) {
+		    copiedPages.add(new BaseSitePage(siteService, page, this, exact));
 		}
+		m_pages = new ResourceVector(copiedPages);
 		m_pagesLazy = other.m_pagesLazy;
 
 		// deep copy the groups, but avoid triggering fetching by passing false to getGroups
@@ -1730,6 +1729,25 @@ public class BaseSite implements Site
 	 */
 	public void removeGroup(Group group)
 	{
+		if(group.isLocked()) {
+			log.error("Error, cannot remove a locked group");
+			return;
+		}
+		// remove it
+		m_groups.remove(group);
+
+		// track so we can clean up related on commit
+		m_deletedGroups.add(group);
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public void deleteGroup(Group group) throws IllegalStateException
+	{
+		if (group.isLocked()) {
+			throw new IllegalStateException("Error, cannot remove group: " + group.getId() + " because it is locked");
+		}
 		// remove it
 		m_groups.remove(group);
 
@@ -1807,7 +1825,7 @@ public class BaseSite implements Site
 				}
 				catch (Exception t)
 				{
-					M_log.warn("getAzg: " + t);
+					log.warn("getAzg: " + t);
 				}
 			}
 		}
@@ -1996,6 +2014,4 @@ public class BaseSite implements Site
 	public void setFullyLoaded(boolean flag) {
 		m_fullyLoaded = flag;
 	}
-
-
 }

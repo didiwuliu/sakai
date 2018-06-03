@@ -38,10 +38,9 @@ import javax.faces.context.ExternalContext;
 import javax.faces.context.FacesContext;
 import javax.faces.event.ActionEvent;
 
+import lombok.extern.slf4j.Slf4j;
+
 import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.sakaiproject.authz.api.SecurityService;
@@ -67,6 +66,7 @@ import org.sakaiproject.user.api.PreferencesService;
 import org.sakaiproject.util.CalendarChannelReferenceMaker;
 import org.sakaiproject.util.CalendarReferenceToChannelConverter;
 import org.sakaiproject.util.CalendarUtil;
+import org.sakaiproject.util.CalendarEventType;
 import org.sakaiproject.util.EntryProvider;
 import org.sakaiproject.util.MergedList;
 import org.sakaiproject.util.MergedListEntryProviderFixedListWrapper;
@@ -77,6 +77,7 @@ import org.sakaiproject.entitybroker.EntityReference;
 import org.sakaiproject.entitybroker.entityprovider.extension.ActionReturn;
 import org.sakaiproject.entitybroker.exception.EntityNotFoundException;
 
+@Slf4j
 public class CalendarBean {
 
 	public static final String 						MODE_MONTHVIEW			= "month";
@@ -88,12 +89,11 @@ public class CalendarBean {
 	private static final String 					SCHEDULE_TOOL_ID		= "sakai.schedule";
 	
 	private static final String 					MERGED_CALENDARS_PROP 	= "mergedCalendarReferences";
-	
-	/** Our log (commons). */
-	private static Logger								LOG						= LoggerFactory.getLogger(CalendarBean.class);
 
 	/** Resource bundle */
 	private transient ResourceLoader				msgs					= new ResourceLoader("calendar");
+	
+	private CalendarUtil calendarUtil = new CalendarUtil();
 	
 	/** Bean members */
 	private String									viewMode				= MODE_MONTHVIEW;
@@ -118,7 +118,7 @@ public class CalendarBean {
 	private CalendarEventVector						calendarEventVector		= null;
 	private String									siteId					= null;
 
-	private Map	<String, String>									eventImageMap			= new HashMap<String, String>();
+	private Map	<String, String>					eventIconMap			= new HashMap<String, String>();
 	
 	private long									lastModifiedPrefs		= 0l;
 	private Map										priorityColorsMap		= null;
@@ -152,9 +152,6 @@ public class CalendarBean {
 	}
 	
 	public String getInitValues() {
-		// reload localized event types
-		EventTypes.reloadLocalization();
-		
 		long lastModified = PrefsBean.getPreferenceLastModified();
 		if(lastModifiedPrefs != lastModified)
 			readPreferences();
@@ -169,7 +166,7 @@ public class CalendarBean {
 	// Private methods
 	// ######################################################################################
 	private void readPreferences() {
-		LOG.debug("Reading preferences...");
+		log.debug("Reading preferences...");
 		lastModifiedPrefs = PrefsBean.getPreferenceLastModified();
 		
 		// view mode
@@ -203,27 +200,7 @@ public class CalendarBean {
 	
 	private List getCalendarReferences() {
 		// get merged calendars channel refs
-		String initMergeList = null;
-		try{
-			ToolConfiguration tc = M_ss.getSite(getSiteId()).getToolForCommonId(SCHEDULE_TOOL_ID);
-			if(tc != null) {
-				initMergeList = tc.getPlacementConfig().getProperty(MERGED_CALENDARS_PROP);
-			}
-		}catch(IdUnusedException e){
-			initMergeList = null;
-		}
-		
-		// load all calendar channels (either primary or merged calendars)
-		String primaryCalendarReference = M_ca.calendarReference(getSiteId(), SiteService.MAIN_CONTAINER);
- 		MergedList mergedCalendarList = loadChannels(primaryCalendarReference, initMergeList, null);
- 		
-		// add external calendar subscriptions
-        List referenceList = mergedCalendarList.getReferenceList();
-        Set subscriptionRefList = M_ecs.getCalendarSubscriptionChannelsForChannels(
-        		primaryCalendarReference,
-        		referenceList);
-        referenceList.addAll(subscriptionRefList);
-				
+		List referenceList = M_ca.getCalendarReferences(getSiteId());
 		return referenceList;
 	}
 	
@@ -293,6 +270,12 @@ public class CalendarBean {
 				lastDay.set(Calendar.MINUTE, 59);
 				lastDay.set(Calendar.SECOND, 59);
 				lastDay.set(Calendar.MILLISECOND, 999);
+				dayOfWeek = lastDay.get(Calendar.DAY_OF_WEEK);
+				// TODO Allow dynamic choice of first day of week
+				while(dayOfWeek != Calendar.SUNDAY){
+					lastDay.add(Calendar.DAY_OF_WEEK, 1);
+					dayOfWeek = lastDay.get(Calendar.DAY_OF_WEEK);
+				}
 			}else{
 				// MONTH VIEW
 				
@@ -325,7 +308,7 @@ public class CalendarBean {
 				lastDay.set(Calendar.MILLISECOND, 999);
 				dayOfWeek = lastDay.get(Calendar.DAY_OF_WEEK);
 				// TODO Allow dynamic choice of first day of week
-				while(dayOfWeek != Calendar.SATURDAY){
+				while(dayOfWeek != Calendar.SUNDAY){
 					lastDay.add(Calendar.DAY_OF_WEEK, 1);
 					dayOfWeek = lastDay.get(Calendar.DAY_OF_WEEK);
 				}
@@ -346,7 +329,7 @@ public class CalendarBean {
 		
 		TimeZone timeZone = getCurrentUserTimezone();
 		DateTime start = new DateTime(c).withZone(DateTimeZone.forTimeZone(timeZone)).withTime(0, 0, 0, 0);
-		LOG.debug("looking for events for: " + start);
+		log.debug("looking for events for: {}", start);
 		Time sod = M_ts.newTime(start.getMillis());
 		DateTime endOfDay = new DateTime(c).withZone(DateTimeZone.forTimeZone(timeZone)).withTime(23, 59, 59, 0);
 		Time eod = M_ts.newTime(endOfDay.getMillis());
@@ -357,7 +340,7 @@ public class CalendarBean {
 			CalendarEvent ce = (CalendarEvent) i.next();
 			TimeRange tr = ce.getRange();
 			if(range.contains(tr.firstTime()) || range.contains(tr.lastTime())){
-				LOG.debug("found event: " + ce.getDisplayName());
+				log.debug("found event: {}", ce.getDisplayName());
 				cev.add(ce);
 			}
 		}
@@ -371,7 +354,7 @@ public class CalendarBean {
 	private TimeZone getCurrentUserTimezone() {
 		
 		TimeZone tz = TimeService.getLocalTimeZone();
-		LOG.debug("got tz " + tz.getDisplayName());
+		log.debug("got tz {}", tz.getDisplayName());
 		return tz;
 	}
 //	}
@@ -384,7 +367,7 @@ public class CalendarBean {
 			EventSummary es = new EventSummary();
 			es.setDisplayName(e.getDisplayName());
 			es.setType(e.getType());
-			es.setTypeLocalized(EventTypes.getLocalizedEventType(e.getType()));
+			es.setTypeLocalized(calendarUtil.getLocalizedEventType(e.getType()));
 			es.setCalendarRef(e.getCalendarReference());
 			es.setEventRef(e.getId());
 			es.setUrl(e.getUrl());
@@ -507,7 +490,7 @@ public class CalendarBean {
 			selectedEventRef = null;
 			updateEventList = true;
 		}catch(Exception ex){
-			LOG.error("Error getting selectedDate:" + ex.toString());
+			log.error("Error getting selectedDate: {}", ex.toString());
 		}
 	}
 
@@ -520,7 +503,7 @@ public class CalendarBean {
 			selectedEvent = null;
 			updateEventList = false;
 		}catch(Exception ex){
-			LOG.error("Error getting selectedEventRef:" + ex.toString());
+			log.error("Error getting selectedEventRef: {}", ex.toString());
 		}
 	}
 
@@ -529,7 +512,7 @@ public class CalendarBean {
 			selectedEventRef = null;
 			updateEventList = true;
 		}catch(Exception ex){
-			LOG.error("Error in backToEventList:" + ex.toString());
+			log.error("Error in backToEventList: {}", ex.toString());
 		}
 	}
 	
@@ -765,7 +748,7 @@ public class CalendarBean {
 				selectedEvent.setDisplayName(event.getDisplayName());
 				selectedEvent.setDate(event.getRange());
 				selectedEvent.setType(event.getType());
-				selectedEvent.setTypeLocalized(EventTypes.getLocalizedEventType(event.getType()));
+				selectedEvent.setTypeLocalized(calendarUtil.getLocalizedEventType(event.getType()));
 				selectedEvent.setDescription(event.getDescriptionFormatted());
 				selectedEvent.setLocation(event.getLocation());
 				Site site = M_ss.getSite(calendar.getContext());
@@ -808,10 +791,9 @@ public class CalendarBean {
 				}
 				
 			}catch(IdUnusedException e){
-				LOG.error("IdUnusedException: " + e.getMessage());
+				log.error("IdUnusedException: {}", e.getMessage());
 			}catch(PermissionException e){
-				e.printStackTrace();
-				LOG.error("Permission exception: " + e.getMessage());
+				log.error("Permission exception: {}", e.getMessage());
 			}
 		}
 		return selectedEvent;
@@ -838,7 +820,7 @@ public class CalendarBean {
 			}
 			catch (IdUnusedException e)
 			{
-				LOG.error("IdUnusedException: " + e.getMessage());
+				log.error("IdUnusedException: {}", e.getMessage());
 			}
 		}
 		if (tc == null)
@@ -859,28 +841,16 @@ public class CalendarBean {
 		}
 	}
 
-	// tbd: this needs to used gif files defined in calendar-tool/tool/src/config/.../calendar.config
-	public synchronized Map<String, String> getEventImageMap() {
-		if(eventImageMap == null || eventImageMap.size() == 0){
-			eventImageMap = new HashMap<String, String>();
-			eventImageMap.put("Academic Calendar", imgLocation + "academic_calendar.gif");
-			eventImageMap.put("Activity", imgLocation + "activity.gif");
-			eventImageMap.put("Cancellation", imgLocation + "cancelled.gif");
-			eventImageMap.put("Class section - Discussion", imgLocation + "class_dis.gif");
-			eventImageMap.put("Class section - Lab", imgLocation + "class_lab.gif");
-			eventImageMap.put("Class section - Lecture", imgLocation + "class_lec.gif");
-			eventImageMap.put("Class section - Small Group", imgLocation + "class_sma.gif");
-			eventImageMap.put("Class session", imgLocation + "class_session.gif");
-			eventImageMap.put("Computer Session", imgLocation + "computersession.gif");
-			eventImageMap.put("Deadline", imgLocation + "deadline.gif");
-			eventImageMap.put("Exam", imgLocation + "exam.gif");
-			eventImageMap.put("Meeting", imgLocation + "meeting.gif");
-			eventImageMap.put("Multidisciplinary Conference", imgLocation + "multi-conference.gif");
-			eventImageMap.put("Quiz", imgLocation + "quiz.gif");
-			eventImageMap.put("Special event", imgLocation + "special_event.gif");
-			eventImageMap.put("Web Assignment", imgLocation + "webassignment.gif");
+	public Map<String, String> getEventIconMap() {
+		Map<String, String> spanIconMap = new HashMap<>();
+		Map<String, String> iconMap = CalendarEventType.getIcons();
+		Set<String> eventKeys = iconMap.keySet();
+		for (String eventType: eventKeys)
+		{
+			spanIconMap.put(eventType, "<span class=\"icon " + iconMap.get(eventType) + "\"></span>");
 		}
-		return eventImageMap;
+		
+		return spanIconMap;
 	}
 	
 	public String getImgLocation() {

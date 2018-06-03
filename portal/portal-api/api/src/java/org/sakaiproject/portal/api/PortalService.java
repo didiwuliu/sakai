@@ -22,12 +22,14 @@
 package org.sakaiproject.portal.api;
 
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
 
 import org.sakaiproject.content.api.ContentHostingService;
 import org.sakaiproject.tool.api.Placement;
+import org.sakaiproject.site.api.Site;
 
 /**
  * Portal Service acts as a focus for all Portal based activities, the service implementation
@@ -269,11 +271,7 @@ public interface PortalService
 	 * @return
 	 */
 	SiteNeighbourhoodService getSiteNeighbourhoodService();
-   
-	/* optional portal links for portal header (SAK-22912)
-	 */
-	String getPortalLinks();
-	
+
 	/**
 	 * Bean setter for Content Hosting dependency.
 	 * @param contentHostingService
@@ -285,7 +283,14 @@ public interface PortalService
 	 * @return
 	 */
 	ContentHostingService getContentHostingService();
-		
+
+	/**
+	 * Retrieves the url for the ContentItem selector - if there are any to select
+	 * @param site The site that is being rendered.
+	 * @return The ContentItem selctor URL or null
+	 */
+	String getContentItemUrl(Site site);
+
 	/**
 	 * Retrieves the site collection ID for a placement for file browsing to an appropriate location.
 	 * If this is null or cannot be found, the user's My Workspace resources are returned.
@@ -324,5 +329,15 @@ public interface PortalService
 	 * @return the skin prefix. Will return empty string if no prefix is set. 
 	 */
 	public String getSkinPrefix();
+
+	/**
+	 * @return the quick links title for display in the top navigation bar. Will return empty string if no title is set.
+	 */
+	public String getQuickLinksTitle(String siteSkin);
+
+	/**
+	 * @return the quick links for display in the top navigation bar. Will return and empty List if no quick links are set.
+	 */
+	public List<Map> getQuickLinks(String siteSkin);
 
 }

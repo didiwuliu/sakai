@@ -34,10 +34,10 @@ should be included in file importing DeliveryMessages
       <h:dataTable value="#{question.answers}" var="answer">
         <h:column>
           <h:panelGroup id="image" rendered="#{answer.description eq 'true' && question.responseId eq answer.value}"
-            styleClass="icon-sakai-check feedBackCheck" >
+            styleClass="icon-sakai--check feedBackCheck" >
           </h:panelGroup>
           <h:panelGroup id="image2" rendered="#{answer.description ne 'true' && question.responseId eq answer.value}"
-            styleClass="icon-sakai-delete feedBackCross">
+            styleClass="icon-sakai--delete feedBackCross">
           </h:panelGroup>
        </h:column>
      </h:dataTable>
@@ -64,7 +64,7 @@ should be included in file importing DeliveryMessages
   </h:panelGroup>
 
 <h:panelGroup>
-	<h:commandLink id="cmdclean" value="#{deliveryMessages.reset_selection}" action="#{delivery.cleanRadioButton}" 
+	<h:commandLink id="cmdclean" value="#{deliveryMessages.reset_selection}" action="#{delivery.cleanRadioButton}" onclick="saveTime(); serializeImagePoints();"
 		rendered="#{(delivery.actionString=='previewAssessment' || delivery.actionString=='previewAssessmentPublished'
                 || delivery.actionString=='takeAssessment' 
                 || delivery.actionString=='takeAssessmentViaUrl')}">

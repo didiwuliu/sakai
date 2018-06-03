@@ -21,13 +21,10 @@
 
 package org.sakaiproject.announcement.impl;
 
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.sakaiproject.announcement.api.AnnouncementChannel;
 import org.sakaiproject.announcement.api.AnnouncementMessage;
 import org.sakaiproject.announcement.api.AnnouncementMessageEdit;
 import org.sakaiproject.announcement.api.AnnouncementMessageHeader;
@@ -66,14 +63,12 @@ import org.sakaiproject.util.SiteEmailNotification;
  * SiteEmailNotificationAnnc fills the notification message and headers with details from the announcement message that triggered the notification event.
  * </p>
  */
+@Slf4j
 public class SiteEmailNotificationAnnc extends SiteEmailNotification  
 				implements ScheduledInvocationCommand
 {
 	private static ResourceLoader rb = new ResourceLoader("siteemaanc");
 	private static final String PORTLET_CONFIG_PARM_MERGED_CHANNELS = "mergedAnnouncementChannels";
-
-	/** Our logger. */
-	private static Logger M_log = LoggerFactory.getLogger(SiteEmailNotificationAnnc.class);
 
 	private EntityManager entityManager;
 	private SecurityService securityService;
@@ -184,7 +179,7 @@ public class SiteEmailNotificationAnnc extends SiteEmailNotification
 		}
 		catch (Exception ignore)
 		{
-			M_log.warn("Failed to load site: "+ siteId+ " for: "+ event.getResource());
+			log.warn("Failed to load site: {} for: {}", siteId, event.getResource());
 		}
 
 		// Now build up the message text.
@@ -376,7 +371,7 @@ public class SiteEmailNotificationAnnc extends SiteEmailNotification
 		// SAK-20988 - emailFromReplyable@org.sakaiproject.event.api.NotificationService is deprecated
 		boolean notificationEmailFromReplyable = ServerConfigurationService.getBoolean("notify.email.from.replyable", false);
 		if (notificationEmailFromReplyable 
-		        && from.contains("no-reply@") 
+		        && from.contains(userEmail)
 		        && userId != null) 
 		{
 				try
@@ -387,7 +382,7 @@ public class SiteEmailNotificationAnnc extends SiteEmailNotification
 					if ((userEmail != null) && (userEmail.trim().length()) == 0) userEmail = null;
 					
 				} catch (UserNotDefinedException e) {
-					M_log.warn("Failed to load user from announcement header: " + userId + ". Will send from no-reply@" + ServerConfigurationService.getServerName()  + " instead.");
+					log.warn("Failed to load user from announcement header: {}. Will send from no-reply@{} instead.", userId, ServerConfigurationService.getServerName());
 				}
 				
 				// some fallback positions
@@ -423,38 +418,42 @@ public class SiteEmailNotificationAnnc extends SiteEmailNotification
 	{
 		// get the message
 		final Reference ref = entityManager.newReference(opaqueContext);
-		
-		// needed to access the message
-		enableSecurityAdvisorToGetAnnouncement();
-		
-		final AnnouncementMessage msg = (AnnouncementMessage) ref.getEntity();
-		final AnnouncementMessageHeader hdr = (AnnouncementMessageHeader) msg.getAnnouncementHeader();
-
-		// read the notification options
-		final String notification = msg.getProperties().getProperty("notificationLevel");
-
-		int noti = NotificationService.NOTI_OPTIONAL;
-		if ("r".equals(notification))
-		{
-			noti = NotificationService.NOTI_REQUIRED;
-		}
-		else if ("n".equals(notification))
-		{
-			noti = NotificationService.NOTI_NONE;
-		}
+		try {
+			// needed to access the message
+			enableSecurityAdvisorToGetAnnouncement();
 			
-		final Event delayedNotificationEvent = eventTrackingService.newEvent("annc.schInv.notify", msg.getReference(), true, noti);
-//		eventTrackingService.post(event);
-
-		NotificationEdit notify = notificationService.addTransientNotification();
+			final AnnouncementMessage msg = (AnnouncementMessage) ref.getEntity();
+			if (msg!=null) {
+				final AnnouncementMessageHeader hdr = (AnnouncementMessageHeader) msg.getAnnouncementHeader();
 		
-		super.notify(notify, delayedNotificationEvent);
-
-		// since we build the notification by accessing the
-		// message within the super class, can't remove the
-		// SecurityAdvisor until this point
-		// done with access, need to remove from stack
-		disableSecurityAdvisor();
+				// read the notification options
+				final String notification = msg.getProperties().getProperty("notificationLevel");
+		
+				int noti = NotificationService.NOTI_OPTIONAL;
+				if ("r".equals(notification))
+				{
+					noti = NotificationService.NOTI_REQUIRED;
+				}
+				else if ("n".equals(notification))
+				{
+					noti = NotificationService.NOTI_NONE;
+				}
+					
+				final Event delayedNotificationEvent = eventTrackingService.newEvent("annc.schInv.notify", msg.getReference(), true, noti);
+				//eventTrackingService.post(event);
+		
+				NotificationEdit notify = notificationService.addTransientNotification();
+				
+				super.notify(notify, delayedNotificationEvent);
+			}
+			
+		} finally {
+			// since we build the notification by accessing the
+			// message within the super class, can't remove the
+			// SecurityAdvisor until this point
+			// done with access, need to remove from stack
+			disableSecurityAdvisor();
+		}
 	}
 
 	/**

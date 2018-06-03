@@ -21,62 +21,49 @@
 
 package org.sakaiproject.lessonbuildertool.service;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.Method;
-import java.net.URLEncoder;
+import java.net.URL;
+import java.net.URLConnection;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.HashMap;
-import java.util.Iterator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.Locale;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.regex.Pattern;
-import java.net.URL;
-import java.net.URLConnection;
 
+import javax.servlet.ServletConfig;
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletException;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.context.MessageSource;
 
 import org.sakaiproject.authz.api.AuthzGroupService;
-import org.sakaiproject.authz.api.AuthzGroup;
-import org.sakaiproject.authz.api.Member;
 import org.sakaiproject.authz.cover.SecurityService;
 import org.sakaiproject.component.cover.ServerConfigurationService;
-import org.sakaiproject.site.api.SiteService;
-import org.sakaiproject.site.api.Site;
 import org.sakaiproject.site.api.Group;
-import org.sakaiproject.site.api.SitePage;
-import org.sakaiproject.site.api.ToolConfiguration;
+import org.sakaiproject.site.api.Site;
+import org.sakaiproject.site.api.SiteService;
+import org.sakaiproject.lessonbuildertool.SimplePage;
+import org.sakaiproject.lessonbuildertool.SimplePageLogEntry;
+import org.sakaiproject.lessonbuildertool.SimplePageItem;
+import org.sakaiproject.lessonbuildertool.tool.beans.SimplePageBean;
+import org.sakaiproject.lessonbuildertool.model.SimplePageToolDao;
 import org.sakaiproject.tool.api.Placement;
 import org.sakaiproject.tool.api.Session;
 import org.sakaiproject.tool.cover.SessionManager;
 import org.sakaiproject.tool.cover.ToolManager;
 import org.sakaiproject.user.api.User;
 import org.sakaiproject.user.cover.UserDirectoryService;
-import org.sakaiproject.util.Validator;
-import org.sakaiproject.util.Web;
-import org.springframework.context.MessageSource;
 import org.sakaiproject.util.FormattedText;
-import org.sakaiproject.lessonbuildertool.tool.beans.SimplePageBean;
-import org.sakaiproject.lessonbuildertool.model.SimplePageToolDao;
-import org.sakaiproject.lessonbuildertool.SimplePage;
-import org.sakaiproject.lessonbuildertool.SimplePageItem;
-import org.sakaiproject.lessonbuildertool.service.LessonsAccess;
 
 /**
  * <p>
@@ -95,6 +82,7 @@ import org.sakaiproject.lessonbuildertool.service.LessonsAccess;
  * @version $Revision: $
  */
 @SuppressWarnings({ "serial", "deprecation" })
+@Slf4j
 public class AjaxServer extends HttpServlet
 {
    private static final String UTF8 = "UTF-8";
@@ -104,15 +92,13 @@ public class AjaxServer extends HttpServlet
    private static AuthzGroupService authzGroupService;
    private static SimplePageToolDao simplePageToolDao;
    private static LessonsAccess lessonsAccess;
+   private static LessonBuilderAccessService lessonBuilderAccessService;
 
    public void setSimplePageToolDao(Object dao) {
        log.info("setdao " + dao);
        simplePageToolDao = (SimplePageToolDao) dao;
    }
 
-   /** Our log (commons). */
-   private static Logger log = LoggerFactory.getLogger(AjaxServer.class);
-   
    public static final String FILTERHTML = "lessonbuilder.filterhtml";
    private static String filterHtml = ServerConfigurationService.getString(FILTERHTML);
 
@@ -395,13 +381,14 @@ public class AjaxServer extends HttpServlet
 	    // get all users in site and add entries to user@groups
 	    // this will have all the groups each user belongs to
 	    site = siteService.getSite(siteId);
+	    String siteRef = site.getReference();
 	    HashSet<String> siteGroup = new HashSet<String>();
 	    siteGroup.add("/site/" + siteId);
-	    // not in 2.8   users = authzGroupService.getAuthzUsersInGroups(siteGroup);
-	    users = authzGroupService.getUsersIsAllowed("site.visit", siteGroup);
-
-	    for (String userId: users) {
-		user2groups.put(userId, null);
+	    //users = authzGroupService.getUsersIsAllowed("site.visit", siteGroup);
+	    // only want students
+	    List<User>userList = SecurityService.unlockUsers("section.role.student", siteRef);
+	    for (User user: userList) {
+		user2groups.put(user.getId(), null);
 	    }
 
 	    // get list of groups, either specified list or all groups in site
@@ -511,7 +498,6 @@ public class AjaxServer extends HttpServlet
 	    }
 	    siteId = page.getSiteId();
 	} catch (Exception e) {
-	    e.printStackTrace();
 	    log.error("Ajax insertBreakBefore passed invalid data " + e);
 	    return null;
 	}
@@ -647,7 +633,6 @@ public class AjaxServer extends HttpServlet
 	    page = simplePageToolDao.getPage(item.getPageId());
 	    siteId = page.getSiteId();
 	} catch (Exception e) {
-	    e.printStackTrace();
 	    log.error("Ajax setcolumnproperties passed invalid data " + e);
 	    return null;
 	}
@@ -713,7 +698,6 @@ public class AjaxServer extends HttpServlet
 			page = simplePageToolDao.getPage(item.getPageId());
 			siteId = page.getSiteId();
 		} catch (Exception e) {
-			e.printStackTrace();
 			log.error("Ajax setSectionCollapsible passed invalid data " + e);
 			return null;
 		}
@@ -792,7 +776,6 @@ public class AjaxServer extends HttpServlet
 	    page = simplePageToolDao.getPage(item.getPageId());
 	    siteId = page.getSiteId();
 	} catch (Exception e) {
-	    e.printStackTrace();
 	    log.error("Ajax deleteBreak passed invalid data " + e);
 	    return null;
 	}
@@ -824,6 +807,50 @@ public class AjaxServer extends HttpServlet
 	simplePageToolDao.quickDelete(item);
 
 	return "ok";
+
+    }
+
+    public static String isLogged(String itemId) {
+	if (itemId == null) {
+	    log.error("Ajax isLogged passed null itemid");
+	    return null;
+	}
+
+	itemId = itemId.trim();
+
+	// maybe this isn't needed. Just trying to verify that user
+	// is actually in the site
+	SimplePageItem item = null;
+	SimplePage page = null;
+	String siteId = null;
+	try {
+	    item = simplePageToolDao.findItem(Long.parseLong(itemId));
+	    page = simplePageToolDao.getPage(item.getPageId());
+	    siteId = page.getSiteId();
+	} catch (Exception e) {
+	    log.error("Ajax track passed invalid data " + e);
+	    return null;
+	}
+	// user can pass any item id they want. It doesnt' make sense to protect against this, since doing that is
+	// more work than just looking at the link. But only allow it for actual links.
+	if (siteId == null || item.getType() != SimplePageItem.RESOURCE) {
+	    log.error("Ajax isLogged passed bad item " + itemId);
+	    return null;
+	}
+
+	String ref = "/site/" + siteId;
+	if (!SecurityService.unlock(SimplePage.PERMISSION_LESSONBUILDER_READ, ref)) {
+	    // user doesn't have permission in site
+	    // not worth testing whether they have access to the page
+	    return null;
+	}
+
+	// there should be no required items on student pages, so we just pass -1
+	SimplePageLogEntry entry = simplePageToolDao.getLogEntry(SessionManager.getCurrentSessionUserId(), item.getId(), -1L);
+	if (entry != null)
+	    return "ok";
+	else
+	    return "fail";
 
     }
 
@@ -899,6 +926,9 @@ public class AjaxServer extends HttpServlet
 	  String itemId = req.getParameter("itemid");
 	  String csrfToken = req.getParameter("csrf");
 	  out.println(deleteItem(itemId, csrfToken));
+      } else if (op.equals("islogged")) {
+	  String itemId = req.getParameter("itemid");
+	  out.println(isLogged(itemId));
       }
 
    }
@@ -917,6 +947,10 @@ public class AjaxServer extends HttpServlet
 
     public void setLessonsAccess(LessonsAccess s) {
         lessonsAccess = s;
+    }
+
+    public void setLessonBuilderAccessService(LessonBuilderAccessService s) {
+        lessonBuilderAccessService = s;
     }
 
 }

@@ -30,16 +30,14 @@ import java.util.Enumeration;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.ServletOutputStream;
+
+import lombok.extern.slf4j.Slf4j;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
 import org.apache.commons.lang.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.tsugi.basiclti.BasicLTIUtil;
 import org.sakaiproject.authz.cover.SecurityService;
 import org.sakaiproject.entity.api.Entity;
 import org.sakaiproject.entity.api.EntityAccessOverloadException;
@@ -69,19 +67,14 @@ import org.sakaiproject.lti.api.LTIExportService;
 import org.sakaiproject.lti.api.LTIExportService.ExportType;
 import org.sakaiproject.lti.api.LTIService;
 //import org.sakaiproject.event.cover.EventTrackingService;
-import org.sakaiproject.component.cover.ComponentManager;
-import org.sakaiproject.util.Validator;
-import org.sakaiproject.util.Web;
 import org.sakaiproject.site.api.SitePage;
 import org.sakaiproject.site.api.ToolConfiguration;
 
-import org.sakaiproject.util.foorm.SakaiFoorm;
-
 import org.sakaiproject.basiclti.LocalEventTrackingService;
 import org.sakaiproject.basiclti.util.SakaiBLTIUtil;
-import org.sakaiproject.basiclti.impl.BasicLTIArchiveBean;
 
 @SuppressWarnings("deprecation")
+@Slf4j
 public class BasicLTISecurityServiceImpl implements EntityProducer {
 	public static final String SERVICE_NAME = BasicLTISecurityServiceImpl.class.getName();
 
@@ -93,16 +86,11 @@ public class BasicLTISecurityServiceImpl implements EntityProducer {
 	public static final String TOOL_REGISTRATION = "sakai.basiclti";
 	public static final String EVENT_BASICLTI_LAUNCH = "basiclti.launch";
 
-	protected static SakaiFoorm foorm = new SakaiFoorm();
-
 	// Note: security needs a proper Resource reference
 
 	/*******************************************************************************
 	 * Dependencies and their setter methods
 	 *******************************************************************************/
-
-	/** Dependency: a logger component. */
-	private Logger logger = LoggerFactory.getLogger(BasicLTISecurityServiceImpl.class);
 
 	/**
 	 * Check security for this entity.
@@ -127,9 +115,9 @@ public class BasicLTISecurityServiceImpl implements EntityProducer {
 		{
 			return false;
 		}
-		// System.out.println("ID="+ref.getId());
-		// System.out.println("Type="+ref.getType());
-		// System.out.println("SubType="+ref.getSubType());
+		log.debug("ID={}", ref.getId());
+		log.debug("Type={}", ref.getType());
+		log.debug("SubType={}", ref.getSubType());
 
 		return false;
 	}
@@ -148,10 +136,10 @@ public class BasicLTISecurityServiceImpl implements EntityProducer {
 	{
 
 
-		logger.info(this +".init()");
+		log.info("{}.init()", this);
 
 		if (ServerConfigurationService.getString(SakaiBLTIUtil.BASICLTI_ENCRYPTION_KEY, null) == null) {
-			logger.error("BasicLTI secrets in database unencrypted, please set "+ SakaiBLTIUtil.BASICLTI_ENCRYPTION_KEY);
+			log.error("BasicLTI secrets in database unencrypted, please set {}", SakaiBLTIUtil.BASICLTI_ENCRYPTION_KEY);
 		}
 		try
 		{
@@ -160,7 +148,7 @@ public class BasicLTISecurityServiceImpl implements EntityProducer {
 		}
 		catch (Throwable t)
 		{
-			logger.warn("init(): ", t);
+			log.warn("init(): {}", t.getMessage());
 		}
 		if ( ltiService == null ) ltiService = (LTIService) ComponentManager.get("org.sakaiproject.lti.api.LTIService");
 		if ( ltiExportService == null ) ltiExportService = (LTIExportService)ComponentManager.get("org.sakaiproject.lti.api.LTIExportService");
@@ -171,7 +159,7 @@ public class BasicLTISecurityServiceImpl implements EntityProducer {
 	 */
 	public void destroy()
 	{
-		logger.info(this +".destroy()");
+		log.info("{}.destroy()", this);
 	}
 
 	/**
@@ -246,7 +234,7 @@ public class BasicLTISecurityServiceImpl implements EntityProducer {
 		}
 		catch (Exception e)
 		{
-			e.printStackTrace();
+			log.warn("Failed to send HTML page.", e);
 		}
 
 	}
@@ -293,13 +281,13 @@ public class BasicLTISecurityServiceImpl implements EntityProducer {
 					}
 					Map<String,Object> deploy = null;
 					String deployStr = refId.substring(7);
-					Long deployKey = foorm.getLongKey(deployStr);
+					Long deployKey = SakaiBLTIUtil.getLongKey(deployStr);
 					if ( deployKey >= 0 ) deploy = ltiService.getDeployDao(deployKey);
 					String placementId = req.getParameter("placement");
-					// System.out.println("deployStr="+deployStr+" deployKey="+deployKey+" placementId="+placementId);
-					// System.out.println(deploy);
-					Long reg_state = foorm.getLongKey(deploy.get(LTIService.LTI_REG_STATE));
-					if ( reg_state == 0 ) 
+					log.debug("deployStr={} deployKey={} placementId={}", deployStr, deployKey, placementId);
+					log.debug(deploy.toString());
+					Long reg_state = SakaiBLTIUtil.getLongKey(deploy.get(LTIService.LTI_REG_STATE));
+					if ( reg_state == 0 )
 					{ 
 						retval = SakaiBLTIUtil.postRegisterHTML(deployKey, deploy, rb, placementId);
 					} 
@@ -324,7 +312,7 @@ public class BasicLTISecurityServiceImpl implements EntityProducer {
 						if ( value == null ) continue;
 						propData.setProperty(key,value);
 					}
-					Long toolKey = foorm.getLongKey(toolStr);
+					Long toolKey = SakaiBLTIUtil.getLongKey(toolStr);
 					if ( toolKey >= 0 )
 					{
 						tool = ltiService.getToolDao(toolKey, ref.getContext());
@@ -340,7 +328,7 @@ public class BasicLTISecurityServiceImpl implements EntityProducer {
 					Map<String,Object> tool = null;
 
 					String contentStr = refId.substring(8);
-					Long contentKey = foorm.getLongKey(contentStr);
+					Long contentKey = SakaiBLTIUtil.getLongKey(contentStr);
 					if ( contentKey >= 0 )
 					{
 						content = ltiService.getContentDao(contentKey,ref.getContext());
@@ -354,7 +342,7 @@ public class BasicLTISecurityServiceImpl implements EntityProducer {
 						}
 						if ( content != null ) 
 						{
-							Long toolKey = foorm.getLongKey(content.get(LTIService.LTI_TOOL_ID));
+							Long toolKey = SakaiBLTIUtil.getLongKey(content.get(LTIService.LTI_TOOL_ID));
 							if ( toolKey >= 0 ) tool = ltiService.getToolDao(toolKey, ref.getContext());
 							if ( tool != null ) 
 							{
@@ -413,7 +401,7 @@ public class BasicLTISecurityServiceImpl implements EntityProducer {
 						}
 						catch(Exception ignore)
 						{
-							logger.warn(": lti export " + ignore.getMessage());
+							log.warn(": lti export {}", ignore.getMessage());
 						}					
 						finally 
 						{
@@ -426,14 +414,14 @@ public class BasicLTISecurityServiceImpl implements EntityProducer {
 								}
 								catch (Throwable ignore) 
 								{
-									logger.warn(": lti export " + ignore.getMessage());
+									log.warn(": lti export {}", ignore.getMessage());
 								}
 							}
 						}
 					}
 					catch (java.lang.IllegalArgumentException ex)
 					{
-						logger.warn(": lti export invalid export type");
+						log.warn(": lti export invalid export type", ex);
 					}
 				}
 				else
@@ -497,7 +485,7 @@ public class BasicLTISecurityServiceImpl implements EntityProducer {
 				} 
 				catch (Exception e)
 				{
-					e.printStackTrace();
+					log.warn("Failed to track event.", e);
 				}
 
 			}
@@ -571,7 +559,7 @@ public class BasicLTISecurityServiceImpl implements EntityProducer {
 				for(int i=0; i < nodeList.getLength(); i++)
 				{
 					BasicLTIArchiveBean basicLTI = new BasicLTIArchiveBean(nodeList.item(i));
-					logger.info("BASIC LTI: " + basicLTI);
+					log.info("BASIC LTI: {}", basicLTI);
 					results.append(", merging basicLTI tool " + basicLTI.getPageTitle());
 				
 					SitePage sitePage = site.addPage();
@@ -590,15 +578,8 @@ public class BasicLTISecurityServiceImpl implements EntityProducer {
 				
 					SiteService.save(site);
 				}
-			} catch (IdUnusedException ie) {
-				// This would be thrown by SiteService.getSite(siteId)
-				ie.printStackTrace();
-			} catch (PermissionException pe) {
-				// This would be thrown by SiteService.save(site)
-				pe.printStackTrace();
 			} catch (Exception e) {
-				// This is a generic exception that would be thrown by the BasicLTIArchiveBean constructor.
-				e.printStackTrace();
+				log.warn("Failed to merge site: {}, error: {}", siteId, e);
 			}
 
 			results.append(".");
@@ -608,16 +589,14 @@ public class BasicLTISecurityServiceImpl implements EntityProducer {
 	@SuppressWarnings("unchecked")
 		public String archive(String siteId, Document doc, Stack stack, String archivePath, List attachments)
 		{
-			logger.info("-------basic-lti-------- archive('"
-				+ StringUtils.join(new Object[] { siteId, doc, stack,
-						archivePath, attachments }, "','") + "')");
+			log.info("-------basic-lti-------- archive('{}')", StringUtils.join(new Object[] { siteId, doc, stack, archivePath, attachments }, "','"));
 
 			StringBuilder results = new StringBuilder("archiving basiclti "+siteId+"\n");
 		
 			int count = 0;
 			try {
 				Site site = SiteService.getSite(siteId);
-				logger.info("SITE: " + site.getId() + " : " + site.getTitle());
+				log.info("SITE: {} : {}", site.getId(), site.getTitle());
 				Element basicLtiList = doc.createElement("org.sakaiproject.basiclti.service.BasicLTISecurityService");
 
 				for (SitePage sitePage : site.getPages()) {
@@ -644,12 +623,12 @@ public class BasicLTISecurityServiceImpl implements EntityProducer {
 				stack.pop();
 			}
 			catch (IdUnusedException iue) {
-				logger.info("SITE ID " + siteId + " DOES NOT EXIST.");
+				log.info("SITE ID {} DOES NOT EXIST.", siteId);
 				results.append("Basic LTI Site does not exist\n");
 			}
 			// Something we did not expect
 			catch (Exception e) {
-				e.printStackTrace();
+				log.warn("Failed to archive: {}, error: {}", siteId, e);
 				results.append("basiclti exception:"+e.getClass().getName()+"\n");
 			}
 			results.append("archiving basiclti ("+count+") tools archived\n");

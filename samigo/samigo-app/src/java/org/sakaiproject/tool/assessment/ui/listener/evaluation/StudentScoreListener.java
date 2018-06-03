@@ -23,32 +23,29 @@
 
 package org.sakaiproject.tool.assessment.ui.listener.evaluation;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import javax.faces.event.AbortProcessingException;
 import javax.faces.event.ActionEvent;
 import javax.faces.event.ActionListener;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
+import org.sakaiproject.tool.assessment.data.dao.grading.AssessmentGradingData;
+import org.sakaiproject.tool.assessment.data.dao.grading.ItemGradingData;
+import org.sakaiproject.tool.assessment.facade.AgentFacade;
+import org.sakaiproject.tool.assessment.services.GradingService;
 import org.sakaiproject.tool.assessment.ui.bean.delivery.DeliveryBean;
 import org.sakaiproject.tool.assessment.ui.bean.delivery.ItemContentsBean;
 import org.sakaiproject.tool.assessment.ui.bean.delivery.SectionContentsBean;
 import org.sakaiproject.tool.assessment.ui.bean.evaluation.StudentScoresBean;
 import org.sakaiproject.tool.assessment.ui.listener.delivery.DeliveryActionListener;
-import org.sakaiproject.tool.assessment.data.dao.grading.AssessmentGradingData;
-import org.sakaiproject.tool.assessment.data.dao.grading.ItemGradingData;
-import org.sakaiproject.tool.assessment.services.GradingService;
 import org.sakaiproject.tool.assessment.ui.listener.evaluation.util.EvaluationListenerUtil;
 import org.sakaiproject.tool.assessment.ui.listener.util.ContextUtil;
 import org.sakaiproject.tool.assessment.util.BeanSort;
-import org.sakaiproject.tool.assessment.facade.AgentFacade;
 import org.sakaiproject.util.FormattedText;
-
-
 
 /**
  * <p>
@@ -61,10 +58,10 @@ import org.sakaiproject.util.FormattedText;
  * @version $Id$
  */
 
-public class StudentScoreListener
+@Slf4j
+ public class StudentScoreListener
   implements ActionListener
 {
-  private static Logger log = LoggerFactory.getLogger(StudentScoreListener.class);
   private static EvaluationListenerUtil util;
   private static BeanSort bs;
 
@@ -127,11 +124,11 @@ public class StudentScoreListener
       
       // Added for SAK-13930
       DeliveryBean updatedDeliveryBean = (DeliveryBean) ContextUtil.lookupBean("delivery");
-      ArrayList parts = updatedDeliveryBean.getPageContents().getPartsContents();
+      List parts = updatedDeliveryBean.getPageContents().getPartsContents();
       Iterator iter = parts.iterator();
       while (iter.hasNext())
       {
-          ArrayList items = ((SectionContentsBean) iter.next()).getItemContents();
+          List items = ((SectionContentsBean) iter.next()).getItemContents();
           Iterator iter2 = items.iterator();
           while (iter2.hasNext())
           {
@@ -149,20 +146,20 @@ public class StudentScoreListener
 
       return true;
     } catch (Exception e) {
-      e.printStackTrace();
+      log.error(e.getMessage(), e);
       return false;
     }
   }
   
   private void buildItemContentsMap(DeliveryBean dbean) {
-	  HashMap itemContentsMap = new HashMap();
-	  ArrayList partsContents = dbean.getPageContents().getPartsContents();
+	  Map itemContentsMap = new HashMap();
+	  List partsContents = dbean.getPageContents().getPartsContents();
 	  if (partsContents != null) {
 		  Iterator iter = partsContents.iterator();
 		  while (iter.hasNext()) {
 			  SectionContentsBean sectionContentsBean = (SectionContentsBean) iter.next();
 			  if (sectionContentsBean != null) {
-				  ArrayList itemContents = sectionContentsBean.getItemContents();
+				  List itemContents = sectionContentsBean.getItemContents();
 				  Iterator iter2 = itemContents.iterator();
 				  while (iter2.hasNext()) {
 					  ItemContentsBean itemContentsBean = (ItemContentsBean) iter2.next();

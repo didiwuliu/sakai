@@ -64,16 +64,6 @@ public class ToolUtils
 	public static final boolean PORTAL_INLINE_EXPERIMENTAL_DEFAULT = true;
 
 	/**
-	 * Determine if this is an inline request (only use in tool code)
-	 *
-	 * @return True if this is a request where a tool will be inlined.
-	 */
-	public static boolean isInlineRequest()
-	{
-		return (isInlineRequest());
-	}
-
-	/**
 	 * Determine if this is an inline request.
 	 *
 	 * @param <code>req</code>
@@ -219,7 +209,7 @@ public class ToolUtils
 		boolean trinity = ServerConfigurationService.getBoolean(PORTAL_INLINE_EXPERIMENTAL, PORTAL_INLINE_EXPERIMENTAL_DEFAULT);
 		if (!trinity) return pageUrl;
 
-		pageUrl = Web.returnUrl(req, "/" + portalPrefix + "/" + effectiveSiteId);
+		pageUrl = Web.returnUrl(req, "/" + portalPrefix + "/" + Web.escapeUrl(effectiveSiteId));
 		if (reset || resetSiteProperty) {
 			pageUrl = pageUrl + "/tool-reset/";
 		} else {

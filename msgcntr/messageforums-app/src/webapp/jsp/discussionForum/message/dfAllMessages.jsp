@@ -8,7 +8,7 @@
 
 <f:view>
 	<sakai:view title="Forums">
-<link rel="stylesheet" href="/library/webjars/jquery-ui/1.11.3/jquery-ui.min.css" type="text/css" />
+<link rel="stylesheet" href="/library/webjars/jquery-ui/1.12.1/jquery-ui.min.css" type="text/css" />
 <link rel="stylesheet" href="/messageforums-tool/css/msgcntr.css" type="text/css" />
 <link rel="stylesheet" href="/messageforums-tool/css/msgcntr_move_thread.css" type="text/css" />
 
@@ -26,8 +26,8 @@
 
 <!--jsp/discussionForum/message/dfAllMessages.jsp-->
 		<link rel="stylesheet" type="text/css" href="../../css/TableSorter.css" />
- 		<script type="text/javascript" src="/library/js/jquery/tablesorter/2.0.3/jquery.tablesorter-2.0.3.min.js"></script>
- 		<sakai:script contextBase="/messageforums-tool" path="/js/forumTopicThreadsSorter.js"/>
+		<script type="text/javascript">includeWebjarLibrary('jquery.tablesorter');</script>
+		<sakai:script contextBase="/messageforums-tool" path="/js/forumTopicThreadsSorter.js"/>
  		<script type="text/javascript">
  		jQuery(document).ready(function(){
  			//sort forum threads
@@ -136,11 +136,6 @@
       				rendered="#{ForumTool.selectedTopic.changeSettings}">
 					<f:param value="#{ForumTool.selectedTopic.topic.id}" name="topicId"/>
 					<h:outputText value="#{msgs.cdfm_topic_settings}"/>
-				</h:commandLink>
-				
-				<h:commandLink action="#{ForumTool.processActionDeleteTopicConfirm}" id="delete_confirm" accesskey="d" rendered="#{!ForumTool.selectedTopic.markForDeletion && ForumTool.displayTopicDeleteOption}">
-				<f:param value="#{ForumTool.selectedTopic.topic.id}" name="topicId"/>
-				<h:outputText value="#{msgs.cdfm_button_bar_delete_topic}"/>
 				</h:commandLink>
 				
 				<h:outputLink id="print" value="javascript:printFriendly('#{ForumTool.printFriendlyUrl}');">

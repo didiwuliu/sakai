@@ -23,7 +23,7 @@ package org.sakaiproject.content.impl;
 import java.text.MessageFormat;
 
 import org.apache.commons.lang.ArrayUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.sakaiproject.component.api.ServerConfigurationService;
 import org.sakaiproject.content.api.ContentFilter;
 import org.sakaiproject.content.api.ContentResource;
@@ -58,6 +58,7 @@ public class HtmlPageFilter implements ContentFilter {
 "<html>\n" +
 "  <head>\n" +
 "    <meta http-equiv=\"Content-Style-Type\" content=\"text/css\" /> \n" +
+"    <meta name=\"viewport\" content=\"width=device-width\">\n" +
 "    <title>{2}</title>\n" +
 "    <link href=\"{0}/tool_base.css\" type=\"text/css\" rel=\"stylesheet\" media=\"all\" />\n" +
 "    <link href=\"{0}/{1}/tool.css\" type=\"text/css\" rel=\"stylesheet\" media=\"all\" />\n" +
@@ -168,7 +169,7 @@ public class HtmlPageFilter implements ContentFilter {
 			if (entity instanceof Site) {
 				Site site = (Site)entity;
 				String strMathJaxEnabled = site.getProperties().getProperty(MATHJAX_ENABLED);
-				if (!StringUtils.isBlank(strMathJaxEnabled))
+				if (StringUtils.isNotBlank(strMathJaxEnabled))
 				{
 					String[] mathJaxTools = strMathJaxEnabled.split(",");
 					if (ArrayUtils.contains(mathJaxTools, "sakai.resources"))

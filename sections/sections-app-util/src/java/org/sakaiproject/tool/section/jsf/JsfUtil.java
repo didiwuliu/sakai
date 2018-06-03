@@ -33,14 +33,13 @@ import javax.faces.application.FacesMessage;
 import javax.faces.context.FacesContext;
 import javax.faces.model.SelectItem;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
 import org.sakaiproject.jsf.util.ConversionUtil;
 import org.sakaiproject.tool.section.jsf.MessagingBean;
-
-import org.sakaiproject.util.ResourceLoader;
 import org.sakaiproject.time.cover.TimeService;
+import org.sakaiproject.util.ResourceLoader;
 
 /**
  * A utility to help deal with common tasks in JSF.
@@ -48,8 +47,8 @@ import org.sakaiproject.time.cover.TimeService;
  * @author <a href="mailto:jholtzman@berkeley.edu">Josh Holtzman</a>
  *
  */
+@Slf4j
 public class JsfUtil {
-	private static final Logger log = LoggerFactory.getLogger(JsfUtil.class);
 
 	/**
 	 * As part of the crutch for JSF's inability to do validation on relative
@@ -194,9 +193,9 @@ public class JsfUtil {
 
 		// Set the am/pm flag to ensure that the time is parsed properly
 		if(am) {
-			str = str + " " + new DateFormatSymbols(new ResourceLoader().getLocale()).getAmPmStrings()[0];
+			str = str + " " + DateFormatSymbols.getInstance(new ResourceLoader().getLocale()).getAmPmStrings()[0];
 		} else {
-			str = str + " " + new DateFormatSymbols(new ResourceLoader().getLocale()).getAmPmStrings()[1];
+			str = str + " " + DateFormatSymbols.getInstance(new ResourceLoader().getLocale()).getAmPmStrings()[1];
 		}
 
 		String pattern = (str.indexOf(':') != -1) ? JsfUtil.TIME_PATTERN_LONG : JsfUtil.TIME_PATTERN_SHORT;
